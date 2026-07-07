@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LanWoW</string>
+
+    <!-- Ricerca -->
+    <string name="regione">Regione</string>
+    <string name="realm">Realm</string>
+    <string name="nome_personaggio">Nome personaggio</string>
+    <string name="cerca">Cerca</string>
+    <string name="compila_tutti_i_campi">Compila regione, realm e nome del personaggio.</string>
+    <string name="errore_ricerca">Errore: %s</string>
+
+    <!-- Profilo -->
+    <string name="item_level">Item level equipaggiato: %.1f</string>
+    <string name="alleanza">Alleanza</string>
+    <string name="orda">Orda</string>
+
+    <!-- Mythic+ -->
+    <string name="mythic_plus">Mythic+</string>
+    <string name="punteggio_stagione">Punteggio stagione corrente</string>
+    <string name="migliori_run">Migliori run</string>
+    <string name="nessuna_run">Nessuna run Mythic+ nella stagione corrente.</string>
+
+    <!-- Raid -->
+    <string name="progressione_raid">Progressione raid</string>
+
+    <!-- WarcraftLogs -->
+    <string name="logs_warcraftlogs">Log — WarcraftLogs</string>
+    <string name="media_best">Media best perf.</string>
+    <string name="media_mediana">Media mediana</string>
+    <string name="parse_per_boss">Parse per boss (raid corrente)</string>
+    <string name="wcl_nessun_log">Nessun log trovato per il raid corrente.</string>
+    <string name="wcl_personaggio_non_trovato">personaggio non trovato su WarcraftLogs (o profilo nascosto)</string>
+    <string name="wcl_credenziali_errate">credenziali API WarcraftLogs non valide</string>
+    <string name="wcl_non_configurato">Per vedere i log serve un client API gratuito di WarcraftLogs. Configuralo nelle impostazioni.</string>
+    <string name="apri_impostazioni">Apri impostazioni</string>
+
+    <!-- Impostazioni -->
+    <string name="impostazioni">Impostazioni</string>
+    <string name="wcl_api">API WarcraftLogs</string>
+    <string name="wcl_istruzioni">Crea un client gratuito su https://www.warcraftlogs.com/api/clients (accedi, scegli un nome qualsiasi, lascia vuoto il redirect) e incolla qui Client ID e Client Secret.</string>
+    <string name="client_id">Client ID</string>
+    <string name="client_secret">Client Secret</string>
+    <string name="salva">Salva</string>
+    <string name="credenziali_salvate">Credenziali salvate</string>
+
+    <!-- Aggiornamenti -->
+    <string name="aggiornamenti">Aggiornamenti</string>
+    <string name="versione_app">Versione installata: %s</string>
+    <string name="controlla_aggiornamenti">Controlla aggiornamenti</string>
+    <string name="nessun_aggiornamento">Nessun aggiornamento disponibile</string>
+    <string name="nessuna_release">nessuna release trovata</string>
+    <string name="nuova_versione">Nuova versione disponibile</string>
+    <string name="aggiornamento_messaggio">È disponibile la versione %1$s (installata: %2$s).</string>
+    <string name="scarica_installa">Scarica e installa</string>
+    <string name="piu_tardi">Più tardi</string>
+    <string name="download_in_corso">Download in corso…</string>
+    <string name="attendere">Attendere…</string>
+    <string name="errore">Errore</string>
+    <string name="errore_download">Download non riuscito: %s</string>
+</resources>

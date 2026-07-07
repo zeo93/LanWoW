@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="gold">#F8B700</color>
+    <color name="dark_bg">#121826</color>
+    <color name="error_red">#FF6B6B</color>
+    <color name="icon_bg">#1B2540</color>
+</resources>

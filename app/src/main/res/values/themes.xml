@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema scuro fisso in stile WoW: superfici blu notte e accenti oro. -->
+    <style name="Theme.LanWoW" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/gold</item>
+        <item name="colorOnPrimary">#1A1200</item>
+        <item name="android:colorBackground">@color/dark_bg</item>
+        <item name="colorSurface">#1B2233</item>
+    </style>
+</resources>
