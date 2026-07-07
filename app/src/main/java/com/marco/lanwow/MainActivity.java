@@ -63,6 +63,14 @@ public class MainActivity extends AppCompatActivity {
         MaterialButton search = findViewById(R.id.btn_search);
         search.setOnClickListener(v -> doSearch());
 
+        MaterialButton clear = findViewById(R.id.btn_clear);
+        clear.setOnClickListener(v -> {
+            nameInput.setText("");
+            realmInput.setText("");
+            results.removeAllViews();
+            errorText.setVisibility(View.GONE);
+        });
+
         NotificationHelper.ensureChannels(this);
         askNotificationPermission();
         DailyWorker.schedule(this);

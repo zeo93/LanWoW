@@ -12,8 +12,6 @@ import android.widget.ProgressBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
-import com.google.android.material.button.MaterialButton;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -63,11 +61,6 @@ public class LogsActivity extends AppCompatActivity {
             LinearLayout col = Ui.newCard(this, results);
             Ui.addSectionTitle(this, col, getString(R.string.logs_warcraftlogs));
             Ui.addText(this, col, getString(R.string.wcl_non_configurato), 14, 0, false);
-            MaterialButton btn = new MaterialButton(this);
-            btn.setText(R.string.apri_impostazioni);
-            btn.setOnClickListener(v ->
-                    startActivity(new Intent(this, SettingsActivity.class)));
-            col.addView(btn);
             return;
         }
         load();

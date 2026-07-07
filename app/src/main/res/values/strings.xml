@@ -8,6 +8,7 @@
     <string name="realm_facoltativo">Realm (facoltativo)</string>
     <string name="nome_personaggio">Nome personaggio</string>
     <string name="cerca">Cerca</string>
+    <string name="pulisci">Pulisci</string>
     <string name="compila_regione_nome">Compila almeno regione e nome del personaggio.</string>
     <string name="nessun_risultato">Nessun personaggio trovato con questo nome.</string>
     <string name="risultati_ricerca">Risultati (%d) — tocca per aprire la scheda</string>
@@ -51,17 +52,10 @@
     <string name="wcl_nessun_log">Nessun log trovato per il raid corrente.</string>
     <string name="wcl_personaggio_non_trovato">personaggio non trovato su WarcraftLogs (o profilo nascosto)</string>
     <string name="wcl_credenziali_errate">credenziali API WarcraftLogs non valide</string>
-    <string name="wcl_non_configurato">Per vedere i log serve un client API gratuito di WarcraftLogs. Configuralo nelle impostazioni.</string>
-    <string name="apri_impostazioni">Apri impostazioni</string>
+    <string name="wcl_non_configurato">I log non sono disponibili in questa build dell\'app.</string>
 
     <!-- Impostazioni -->
     <string name="impostazioni">Impostazioni</string>
-    <string name="wcl_api">API WarcraftLogs</string>
-    <string name="wcl_istruzioni">L\'app include già le credenziali API: non serve configurare nulla. Se vuoi usare le tue, creale su https://www.warcraftlogs.com/api/clients (redirect URL: https://localhost, non spuntare "Public Client") e incollale qui; lascia vuoto per usare quelle integrate.</string>
-    <string name="client_id">Client ID</string>
-    <string name="client_secret">Client Secret</string>
-    <string name="salva">Salva</string>
-    <string name="credenziali_salvate">Credenziali salvate</string>
 
     <!-- Aggiornamenti -->
     <string name="aggiornamenti">Aggiornamenti</string>

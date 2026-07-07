@@ -14,8 +14,6 @@ L'app controlla da sola gli aggiornamenti all'avvio e propone il download della 
 ## Log di WarcraftLogs
 
 Le credenziali API sono integrate nell'APK: i log funzionano senza configurare nulla.
-Volendo si possono usare credenziali proprie (create su <https://www.warcraftlogs.com/api/clients>,
-redirect URL `https://localhost`, senza "Public Client") incollandole nelle **Impostazioni**.
 
 ## Build
 
