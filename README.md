@@ -16,7 +16,7 @@ L'app controlla da sola gli aggiornamenti all'avvio e propone il download della 
 L'API di WarcraftLogs richiede credenziali personali (gratuite):
 
 1. Vai su <https://www.warcraftlogs.com/api/clients> e accedi con il tuo account
-2. Crea un nuovo client (nome qualsiasi, redirect URL vuoto)
+2. Crea un nuovo client: nome qualsiasi, come redirect URL metti `https://localhost` (è obbligatorio ma non viene usato), non spuntare "Public Client"
 3. In **Impostazioni** dell'app incolla Client ID e Client Secret
 
 Senza credenziali l'app mostra comunque tutti i dati di raider.io.

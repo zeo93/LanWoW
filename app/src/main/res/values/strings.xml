@@ -38,7 +38,7 @@
     <!-- Impostazioni -->
     <string name="impostazioni">Impostazioni</string>
     <string name="wcl_api">API WarcraftLogs</string>
-    <string name="wcl_istruzioni">Crea un client gratuito su https://www.warcraftlogs.com/api/clients (accedi, scegli un nome qualsiasi, lascia vuoto il redirect) e incolla qui Client ID e Client Secret.</string>
+    <string name="wcl_istruzioni">Crea un client gratuito su https://www.warcraftlogs.com/api/clients (accedi, scegli un nome qualsiasi, come redirect URL metti https://localhost e non spuntare "Public Client") e incolla qui Client ID e Client Secret.</string>
     <string name="client_id">Client ID</string>
     <string name="client_secret">Client Secret</string>
     <string name="salva">Salva</string>
