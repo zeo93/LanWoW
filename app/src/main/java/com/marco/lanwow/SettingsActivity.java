@@ -26,8 +26,8 @@ public class SettingsActivity extends AppCompatActivity {
 
         TextInputEditText idInput = findViewById(R.id.input_client_id);
         TextInputEditText secretInput = findViewById(R.id.input_client_secret);
-        idInput.setText(WarcraftLogs.clientId(this));
-        secretInput.setText(WarcraftLogs.clientSecret(this));
+        idInput.setText(WarcraftLogs.savedClientId(this));
+        secretInput.setText(WarcraftLogs.savedClientSecret(this));
 
         ((TextView) findViewById(R.id.wcl_help))
                 .setMovementMethod(LinkMovementMethod.getInstance());

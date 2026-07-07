@@ -13,15 +13,20 @@ L'app controlla da sola gli aggiornamenti all'avvio e propone il download della 
 
 ## Log di WarcraftLogs
 
-L'API di WarcraftLogs richiede credenziali personali (gratuite):
-
-1. Vai su <https://www.warcraftlogs.com/api/clients> e accedi con il tuo account
-2. Crea un nuovo client: nome qualsiasi, come redirect URL metti `https://localhost` (è obbligatorio ma non viene usato), non spuntare "Public Client"
-3. In **Impostazioni** dell'app incolla Client ID e Client Secret
-
-Senza credenziali l'app mostra comunque tutti i dati di raider.io.
+Le credenziali API sono integrate nell'APK: i log funzionano senza configurare nulla.
+Volendo si possono usare credenziali proprie (create su <https://www.warcraftlogs.com/api/clients>,
+redirect URL `https://localhost`, senza "Public Client") incollandole nelle **Impostazioni**.
 
 ## Build
+
+Serve un file `secrets.properties` nella cartella del progetto (non è nel repo) con:
+
+```
+wcl.clientId=IL_TUO_CLIENT_ID
+wcl.clientSecret=IL_TUO_CLIENT_SECRET
+```
+
+Poi:
 
 ```
 JAVA_HOME="C:\Program Files\Android\Android Studio\jbr" gradle assembleRelease

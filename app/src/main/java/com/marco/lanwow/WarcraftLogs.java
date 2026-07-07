@@ -29,11 +29,23 @@ public final class WarcraftLogs {
         return !clientId(c).isEmpty() && !clientSecret(c).isEmpty();
     }
 
+    /** Credenziali dalle impostazioni; se vuote usa quelle integrate nell'app. */
     public static String clientId(Context c) {
-        return prefs(c).getString("client_id", "").trim();
+        String v = prefs(c).getString("client_id", "").trim();
+        return v.isEmpty() ? BuildConfig.WCL_CLIENT_ID : v;
     }
 
     public static String clientSecret(Context c) {
+        String v = prefs(c).getString("client_secret", "").trim();
+        return v.isEmpty() ? BuildConfig.WCL_CLIENT_SECRET : v;
+    }
+
+    /** Solo l'override salvato dall'utente (vuoto se si usano le credenziali integrate). */
+    public static String savedClientId(Context c) {
+        return prefs(c).getString("client_id", "").trim();
+    }
+
+    public static String savedClientSecret(Context c) {
         return prefs(c).getString("client_secret", "").trim();
     }
 
