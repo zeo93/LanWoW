@@ -156,11 +156,56 @@ public class MainActivity extends AppCompatActivity {
                 15, getColor(R.color.gold), true);
         for (RaiderIo.SearchResult r : found) {
             LinearLayout col = Ui.newCard(this, results);
-            Ui.addText(this, col, r.name, 18, Ui.classColor(r.cls), true);
-            Ui.addText(this, col, r.realmName + " (" + region.toUpperCase() + ")"
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            col.addView(row, new LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            LinearLayout info = new LinearLayout(this);
+            info.setOrientation(LinearLayout.VERTICAL);
+            row.addView(info, new LinearLayout.LayoutParams(0,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            Ui.addText(this, info, r.name, 18, Ui.classColor(r.cls), true);
+            Ui.addText(this, info, r.realmName + " (" + region.toUpperCase() + ")"
                     + (r.cls.isEmpty() ? "" : " · " + r.cls), 14, 0, false);
+
+            // punteggio M+ caricato in parallelo per ogni risultato
+            TextView score = new TextView(this);
+            score.setText("…");
+            score.setTextSize(18);
+            score.setTypeface(null, android.graphics.Typeface.BOLD);
+            score.setPadding(Ui.dp(this, 8), 0, 0, 0);
+            row.addView(score);
+            loadScore(region, r, score);
+
             ((View) col.getParent()).setOnClickListener(v ->
                     CharacterActivity.open(this, region, r.realmSlug, r.name, r.cls));
         }
+    }
+
+    private void loadScore(String region, RaiderIo.SearchResult r, TextView target) {
+        new Thread(() -> {
+            RaiderIo.Score s;
+            try {
+                s = RaiderIo.fetchScore(region, r.realmSlug, r.name);
+            } catch (Exception e) {
+                s = null;
+            }
+            final RaiderIo.Score fs = s;
+            main.post(() -> {
+                if (fs == null) {
+                    target.setText("");
+                    return;
+                }
+                target.setText(String.format(java.util.Locale.ITALY, "%.0f", fs.value));
+                try {
+                    target.setTextColor(android.graphics.Color.parseColor(fs.color));
+                } catch (Exception ignored) {
+                }
+            });
+        }).start();
     }
 }

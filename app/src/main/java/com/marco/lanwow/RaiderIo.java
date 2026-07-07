@@ -72,6 +72,40 @@ public final class RaiderIo {
         return out;
     }
 
+    /** Punteggio M+ estratto da un profilo: score e colore raider.io. */
+    public static class Score {
+        public double value;
+        public String color = "#ffffff";
+    }
+
+    /** Estrae il punteggio M+ della stagione corrente da un profilo. */
+    public static Score parseSeasonScore(JSONObject profile) {
+        Score s = new Score();
+        JSONArray seasons = profile.optJSONArray("mythic_plus_scores_by_season");
+        if (seasons != null && seasons.length() > 0) {
+            JSONObject season = seasons.optJSONObject(0);
+            JSONObject all = season.optJSONObject("segments") != null
+                    ? season.optJSONObject("segments").optJSONObject("all") : null;
+            if (all != null) {
+                s.value = all.optDouble("score", 0);
+                s.color = all.optString("color", "#ffffff");
+            } else if (season.optJSONObject("scores") != null) {
+                s.value = season.optJSONObject("scores").optDouble("all", 0);
+            }
+        }
+        return s;
+    }
+
+    /** Solo il punteggio M+ corrente (richiesta leggera, usata nei risultati di ricerca). */
+    public static Score fetchScore(String region, String realmSlug, String name)
+            throws Exception {
+        String url = BASE + "?region=" + URLEncoder.encode(region, "UTF-8")
+                + "&realm=" + URLEncoder.encode(realmSlug, "UTF-8")
+                + "&name=" + URLEncoder.encode(name.trim(), "UTF-8")
+                + "&fields=" + URLEncoder.encode("mythic_plus_scores_by_season:current", "UTF-8");
+        return parseSeasonScore(new JSONObject(Http.get(url)));
+    }
+
     public static JSONObject fetchProfile(String region, String realm, String name)
             throws Exception {
         String url = BASE + "?region=" + URLEncoder.encode(region, "UTF-8")

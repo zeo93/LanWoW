@@ -204,25 +204,12 @@ public class CharacterActivity extends AppCompatActivity {
         LinearLayout col = Ui.newCard(this, results);
         Ui.addSectionTitle(this, col, getString(R.string.mythic_plus));
 
-        double score = 0;
+        RaiderIo.Score s = RaiderIo.parseSeasonScore(o);
+        double score = s.value;
         int scoreColor = 0;
-        JSONArray seasons = o.optJSONArray("mythic_plus_scores_by_season");
-        if (seasons != null && seasons.length() > 0) {
-            JSONObject season = seasons.optJSONObject(0);
-            JSONObject all = season.optJSONObject("segments") != null
-                    ? season.optJSONObject("segments").optJSONObject("all") : null;
-            if (all != null) {
-                score = all.optDouble("score", 0);
-                try {
-                    scoreColor = android.graphics.Color.parseColor(all.optString("color", "#ffffff"));
-                } catch (Exception ignored) {
-                }
-            } else {
-                JSONObject scores = season.optJSONObject("scores");
-                if (scores != null) {
-                    score = scores.optDouble("all", 0);
-                }
-            }
+        try {
+            scoreColor = android.graphics.Color.parseColor(s.color);
+        } catch (Exception ignored) {
         }
         Ui.addRow(this, col, getString(R.string.punteggio_stagione),
                 String.format(Locale.ITALY, "%.0f", score), scoreColor);
