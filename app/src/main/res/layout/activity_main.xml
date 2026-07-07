@@ -53,12 +53,13 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:hint="@string/realm">
+                        android:hint="@string/nome_personaggio">
 
                         <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/input_realm"
+                            android:id="@+id/input_name"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:imeOptions="actionSearch"
                             android:inputType="text" />
                     </com.google.android.material.textfield.TextInputLayout>
 
@@ -67,13 +68,12 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:hint="@string/nome_personaggio">
+                        android:hint="@string/realm_facoltativo">
 
                         <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/input_name"
+                            android:id="@+id/input_realm"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:imeOptions="actionSearch"
                             android:inputType="text" />
                     </com.google.android.material.textfield.TextInputLayout>
 

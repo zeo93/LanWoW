@@ -81,32 +81,74 @@ public final class WarcraftLogs {
         return token;
     }
 
-    /**
-     * Classifiche (parse) del personaggio nella zona raid corrente.
-     * Restituisce l'oggetto zoneRankings oppure lancia un'eccezione con messaggio leggibile.
-     */
-    public static JSONObject fetchZoneRankings(Context c, String region, String realmSlug,
-                                               String name) throws Exception {
-        String query = "query($name:String!,$server:String!,$region:String!){"
-                + "characterData{character(name:$name,serverSlug:$server,serverRegion:$region){"
-                + "name zoneRankings}}}";
-        JSONObject variables = new JSONObject()
-                .put("name", name.trim())
-                .put("server", realmSlug)
-                .put("region", region);
-        JSONObject body = new JSONObject().put("query", query).put("variables", variables);
-
+    /** Esegue una query GraphQL e restituisce l'oggetto "data". */
+    private static JSONObject graphql(Context c, String query, JSONObject variables)
+            throws Exception {
+        JSONObject body = new JSONObject().put("query", query);
+        if (variables != null) {
+            body.put("variables", variables);
+        }
         Map<String, String> headers = new HashMap<>();
         headers.put("Authorization", "Bearer " + token(c));
         String resp = Http.post(API_URL, body.toString(), "application/json", headers);
         JSONObject o = new JSONObject(resp);
-
         JSONArray errors = o.optJSONArray("errors");
         if (errors != null && errors.length() > 0) {
             throw new Exception(errors.getJSONObject(0).optString("message", "GraphQL error"));
         }
         JSONObject data = o.optJSONObject("data");
-        JSONObject characterData = data != null ? data.optJSONObject("characterData") : null;
+        if (data == null) {
+            throw new Exception("risposta API vuota");
+        }
+        return data;
+    }
+
+    /** Id della zona Mythic+ corrente su WarcraftLogs (in cache per 7 giorni). */
+    private static int mythicPlusZoneId(Context c) throws Exception {
+        SharedPreferences p = prefs(c);
+        int cached = p.getInt("mplus_zone", 0);
+        long ts = p.getLong("mplus_zone_ts", 0);
+        if (cached > 0 && System.currentTimeMillis() - ts < 7L * 24 * 3600 * 1000) {
+            return cached;
+        }
+        JSONObject data = graphql(c, "{worldData{zones{id name}}}", null);
+        JSONArray zones = data.optJSONObject("worldData") != null
+                ? data.optJSONObject("worldData").optJSONArray("zones") : null;
+        int best = 0;
+        if (zones != null) {
+            for (int i = 0; i < zones.length(); i++) {
+                JSONObject z = zones.optJSONObject(i);
+                if (z != null && z.optString("name", "").contains("Mythic+")
+                        && z.optInt("id", 0) > best) {
+                    best = z.optInt("id", 0);
+                }
+            }
+        }
+        if (best == 0) {
+            throw new Exception("zona Mythic+ non trovata su WarcraftLogs");
+        }
+        p.edit().putInt("mplus_zone", best)
+                .putLong("mplus_zone_ts", System.currentTimeMillis()).apply();
+        return best;
+    }
+
+    /** Parse del personaggio: zoneId 0 = raid corrente, altrimenti la zona indicata. */
+    private static JSONObject fetchRankings(Context c, String region, String realmSlug,
+                                            String name, int zoneId) throws Exception {
+        String rankingsField = zoneId > 0 ? "zoneRankings(zoneID:$zone)" : "zoneRankings";
+        String query = "query($name:String!,$server:String!,$region:String!"
+                + (zoneId > 0 ? ",$zone:Int" : "") + "){"
+                + "characterData{character(name:$name,serverSlug:$server,serverRegion:$region){"
+                + "name " + rankingsField + "}}}";
+        JSONObject variables = new JSONObject()
+                .put("name", name.trim())
+                .put("server", realmSlug)
+                .put("region", region);
+        if (zoneId > 0) {
+            variables.put("zone", zoneId);
+        }
+        JSONObject data = graphql(c, query, variables);
+        JSONObject characterData = data.optJSONObject("characterData");
         JSONObject character = characterData != null
                 ? characterData.optJSONObject("character") : null;
         if (character == null || character.isNull("zoneRankings")) {
@@ -114,5 +156,17 @@ public final class WarcraftLogs {
         }
         Object zr = character.get("zoneRankings");
         return zr instanceof JSONObject ? (JSONObject) zr : new JSONObject(zr.toString());
+    }
+
+    /** Parse del raid corrente. */
+    public static JSONObject fetchRaidRankings(Context c, String region, String realmSlug,
+                                               String name) throws Exception {
+        return fetchRankings(c, region, realmSlug, name, 0);
+    }
+
+    /** Parse delle Mythic+ della stagione corrente. */
+    public static JSONObject fetchMythicPlusRankings(Context c, String region, String realmSlug,
+                                                     String name) throws Exception {
+        return fetchRankings(c, region, realmSlug, name, mythicPlusZoneId(c));
     }
 }

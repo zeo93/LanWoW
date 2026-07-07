@@ -5,10 +5,29 @@
     <!-- Ricerca -->
     <string name="regione">Regione</string>
     <string name="realm">Realm</string>
+    <string name="realm_facoltativo">Realm (facoltativo)</string>
     <string name="nome_personaggio">Nome personaggio</string>
     <string name="cerca">Cerca</string>
-    <string name="compila_tutti_i_campi">Compila regione, realm e nome del personaggio.</string>
+    <string name="compila_regione_nome">Compila almeno regione e nome del personaggio.</string>
+    <string name="nessun_risultato">Nessun personaggio trovato con questo nome.</string>
+    <string name="risultati_ricerca">Risultati (%d) — tocca per aprire la scheda</string>
     <string name="errore_ricerca">Errore: %s</string>
+
+    <!-- Preferiti -->
+    <string name="preferiti">Preferiti</string>
+    <string name="nessun_preferito">Nessun preferito: cerca un personaggio e tocca la stella nella sua scheda.</string>
+    <string name="aggiunto_preferiti">Aggiunto ai preferiti</string>
+    <string name="rimosso_preferiti">Rimosso dai preferiti</string>
+
+    <!-- Log -->
+    <string name="vedi_log">Log</string>
+    <string name="log_di">Log — %s</string>
+    <string name="sezione_raid">Raid corrente</string>
+    <string name="sezione_mplus">Mythic+ stagione corrente</string>
+
+    <!-- Notifiche -->
+    <string name="canale_aggiornamenti">Aggiornamenti app</string>
+    <string name="notifica_aggiornamento">Nuova versione %s disponibile: tocca per aggiornare</string>
 
     <!-- Profilo -->
     <string name="item_level">Item level equipaggiato: %.1f</string>

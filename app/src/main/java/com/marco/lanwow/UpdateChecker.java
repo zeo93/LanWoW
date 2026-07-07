@@ -50,13 +50,26 @@ public class UpdateChecker {
         }
     }
 
-    /** Controllo silenzioso all'avvio: se c'è un aggiornamento mostra il dialog. */
+    /** Controllo silenzioso all'avvio: se c'è un aggiornamento mostra dialog + notifica. */
     public static void checkOnStartup(Activity activity) {
         checkAsync(activity, (update, error) -> {
             if (update != null && !activity.isFinishing()) {
+                NotificationHelper.ensureChannels(activity);
+                NotificationHelper.notifyUpdate(activity, update.version);
                 showUpdateDialog(activity, update);
             }
         });
+    }
+
+    /** Controllo sincrono per il worker in background: aggiornamento disponibile o null. */
+    public static UpdateInfo checkSync(Context context) {
+        try {
+            UpdateInfo info = fetchLatest(context);
+            boolean newer = isNewer(info.version, currentVersion(context)) && info.apkUrl != null;
+            return newer ? info : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public static void checkAsync(Context context, Callback callback) {
