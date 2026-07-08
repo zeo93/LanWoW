@@ -621,9 +621,60 @@ async function checkUpdate() {
   } catch { /* offline o rate limit: pazienza */ }
 }
 
+// ------------------------------------------------------------------ installazione
+
+function setupInstallBanner() {
+  const isStandalone = window.matchMedia("(display-mode: standalone)").matches
+    || navigator.standalone === true;
+  if (isStandalone || store.get("install_dismissed")) {
+    return;
+  }
+  const ua = navigator.userAgent;
+  const isIos = /iphone|ipad|ipod/i.test(ua)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  const banner = document.createElement("div");
+  banner.id = "install-banner";
+  const dismiss = () => { store.set("install_dismissed", true); banner.remove(); };
+
+  if (isIos) {
+    banner.innerHTML = `<div>
+        <b>Installa LanWoW sulla schermata Home</b>
+        <div>Tocca <svg class="share-icon" viewBox="0 0 24 24" width="15" height="15"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 15V3m0 0L8 7m4-4l4 4M5 11v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/></svg> <b>Condividi</b> qui sotto in Safari,
+        poi <b>“Aggiungi alla schermata Home”</b>.</div>
+      </div>
+      <button id="install-close">✕</button>`;
+    document.body.prepend(banner);
+    $("#install-close").onclick = dismiss;
+    return;
+  }
+
+  // Android/desktop Chrome: prompt di installazione nativo
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    banner.innerHTML = `<div>
+        <b>Installa LanWoW</b>
+        <div>Aggiungila alla schermata Home come app.</div>
+      </div>
+      <button id="install-go">Installa</button>
+      <button id="install-close">✕</button>`;
+    document.body.prepend(banner);
+    $("#install-go").onclick = async () => {
+      banner.remove();
+      e.prompt();
+      const choice = await e.userChoice.catch(() => null);
+      if (!choice || choice.outcome !== "accepted") {
+        store.set("install_dismissed", true);
+      }
+    };
+    $("#install-close").onclick = dismiss;
+  });
+}
+
 document.getElementById("footer-version").textContent = VERSION;
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
+setupInstallBanner();
 route();
 checkUpdate();

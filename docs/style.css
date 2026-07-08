@@ -142,3 +142,28 @@ button.outline { background: none; color: var(--gold); border: 1px solid var(--g
 }
 
 footer { text-align: center; color: var(--muted); font-size: 12px; padding: 16px; }
+
+#install-banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: var(--surface2);
+  border-bottom: 2px solid var(--gold);
+  padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+}
+#install-banner > div { flex: 1; font-size: 13px; }
+#install-banner b { color: var(--gold); }
+#install-banner .share-icon { vertical-align: -2px; color: var(--gold); }
+#install-banner button {
+  background: none;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-weight: bold;
+  cursor: pointer;
+}
+#install-banner #install-go { background: var(--gold); color: #1a1200; border: none; }
