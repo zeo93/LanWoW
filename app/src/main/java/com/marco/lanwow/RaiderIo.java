@@ -106,6 +106,79 @@ public final class RaiderIo {
         return parseSeasonScore(new JSONObject(Http.get(url)));
     }
 
+    /** Stagione M+ corrente con date di inizio/fine per la regione. */
+    public static class Season {
+        public String slug;
+        public String name;
+        public long startMs;
+        public long endMs;
+    }
+
+    /**
+     * Trova la stagione M+ principale in corso cercando nelle espansioni recenti.
+     * (11 = Midnight; il ciclo copre anche le espansioni future.)
+     */
+    public static Season fetchCurrentSeason(String region) throws Exception {
+        long now = System.currentTimeMillis();
+        for (int expId = 11; expId <= 15; expId++) {
+            JSONArray seasons;
+            try {
+                JSONObject o = new JSONObject(Http.get(
+                        "https://raider.io/api/v1/mythic-plus/static-data?expansion_id=" + expId));
+                seasons = o.optJSONArray("seasons");
+            } catch (Exception e) {
+                continue;
+            }
+            if (seasons == null) {
+                continue;
+            }
+            for (int i = 0; i < seasons.length(); i++) {
+                JSONObject s = seasons.optJSONObject(i);
+                if (s == null || !s.optBoolean("is_main_season")) {
+                    continue;
+                }
+                JSONObject starts = s.optJSONObject("starts");
+                JSONObject ends = s.optJSONObject("ends");
+                if (starts == null || ends == null) {
+                    continue;
+                }
+                String st = starts.optString(region, "");
+                String en = ends.optString(region, "");
+                if (st.isEmpty() || en.isEmpty()) {
+                    continue;
+                }
+                try {
+                    long stm = java.time.Instant.parse(st).toEpochMilli();
+                    long enm = java.time.Instant.parse(en).toEpochMilli();
+                    if (now >= stm && now < enm) {
+                        Season season = new Season();
+                        season.slug = s.optString("slug");
+                        season.name = s.optString("name");
+                        season.startMs = stm;
+                        season.endMs = enm;
+                        return season;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        throw new Exception("stagione M+ corrente non trovata");
+    }
+
+    /** Cutoff dei percentili (p999 = top 0,1%, p990 = top 1%…) per la stagione. */
+    public static JSONObject fetchSeasonCutoffs(String region, String seasonSlug)
+            throws Exception {
+        String url = "https://raider.io/api/v1/mythic-plus/season-cutoffs?region="
+                + URLEncoder.encode(region, "UTF-8")
+                + "&season=" + URLEncoder.encode(seasonSlug, "UTF-8");
+        JSONObject o = new JSONObject(Http.get(url));
+        JSONObject cutoffs = o.optJSONObject("cutoffs");
+        if (cutoffs == null) {
+            throw new Exception("cutoff non disponibili");
+        }
+        return cutoffs;
+    }
+
     public static JSONObject fetchProfile(String region, String realm, String name)
             throws Exception {
         String url = BASE + "?region=" + URLEncoder.encode(region, "UTF-8")

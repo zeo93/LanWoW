@@ -3,6 +3,12 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/action_title"
+        android:icon="@drawable/ic_title"
+        android:title="@string/titolo_mplus"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/action_favorites"
         android:icon="@android:drawable/btn_star_big_on"
         android:title="@string/preferiti"

@@ -93,6 +93,10 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.action_title) {
+            startActivity(new Intent(this, TitleActivity.class));
+            return true;
+        }
         if (item.getItemId() == R.id.action_favorites) {
             startActivity(new Intent(this, FavoritesActivity.class));
             return true;

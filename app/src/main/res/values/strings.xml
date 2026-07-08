@@ -14,6 +14,19 @@
     <string name="risultati_ricerca">Risultati (%d) — tocca per aprire la scheda</string>
     <string name="errore_ricerca">Errore: %s</string>
 
+    <!-- Titolo M+ -->
+    <string name="titolo_mplus">Titolo M+</string>
+    <string name="stagione">Stagione</string>
+    <string name="periodo">Periodo</string>
+    <string name="avanzamento">Avanzamento stagione</string>
+    <string name="top_01">Top 0,1% — Titolo</string>
+    <string name="top_1">Top 1%</string>
+    <string name="orda_label">Orda</string>
+    <string name="tutti">Tutti</string>
+    <string name="metodo_trend">Previsione basata sull\'andamento rilevato dalle tue consultazioni precedenti.</string>
+    <string name="metodo_fase">Prima stima basata sulla fase della stagione: aprendo questa pagina nei prossimi giorni la previsione si affinerà con l\'andamento reale.</string>
+    <string name="cutoff_note">Il valore a sinistra è il cutoff attuale (raider.io), quello a destra la previsione di fine stagione. Il titolo va al top 0,1% della propria fazione nella regione. La previsione è indicativa: l\'ultima settimana di stagione il cutoff può salire più del previsto.</string>
+
     <!-- Preferiti -->
     <string name="preferiti">Preferiti</string>
     <string name="nessun_preferito">Nessun preferito: cerca un personaggio e tocca la stella nella sua scheda.</string>
