@@ -23,8 +23,11 @@
     <!-- Log -->
     <string name="vedi_log">Log</string>
     <string name="log_di">Log — %s</string>
-    <string name="sezione_raid">Raid corrente</string>
-    <string name="sezione_mplus">Mythic+ stagione corrente</string>
+    <string name="espansione">Espansione</string>
+    <string name="zona">Zona</string>
+    <string name="difficolta">Difficoltà</string>
+    <string name="metrica">Metrica</string>
+    <string name="predefinita">Predefinita</string>
 
     <!-- Notifiche -->
     <string name="canale_aggiornamenti">Aggiornamenti app</string>
