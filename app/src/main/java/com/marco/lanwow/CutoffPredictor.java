@@ -31,8 +31,21 @@ public final class CutoffPredictor {
      */
     public static final long EFFECTIVE_SEASON_MS = 22L * 7 * 24 * 3600 * 1000;
 
+    /** Fine stagione nota o prevista per stagioni specifiche (0 = non nota). */
+    private static long knownEnd(String seasonSlug) {
+        if ("season-mn-1".equals(seasonSlug)) {
+            // chiusura prevista: 11 agosto 2026
+            return java.time.Instant.parse("2026-08-11T00:00:00Z").toEpochMilli();
+        }
+        return 0;
+    }
+
     /** Fine effettiva della stagione ai fini della previsione. */
-    public static long effectiveEnd(long seasonStart, long seasonEnd) {
+    public static long effectiveEnd(String seasonSlug, long seasonStart, long seasonEnd) {
+        long known = knownEnd(seasonSlug);
+        if (known > 0) {
+            return Math.min(seasonEnd, known);
+        }
         return Math.min(seasonEnd, seasonStart + EFFECTIVE_SEASON_MS);
     }
 
@@ -81,7 +94,7 @@ public final class CutoffPredictor {
                                      double current, long seasonStart, long seasonEnd) {
         Prediction out = new Prediction();
         long now = System.currentTimeMillis();
-        seasonEnd = effectiveEnd(seasonStart, seasonEnd);
+        seasonEnd = effectiveEnd(season, seasonStart, seasonEnd);
 
         // 1) regressione lineare sugli snapshot locali, se bastano
         List<long[]> raw = new ArrayList<>();

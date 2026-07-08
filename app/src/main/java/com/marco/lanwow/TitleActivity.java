@@ -161,7 +161,7 @@ public class TitleActivity extends AppCompatActivity {
     private void showSeason(RaiderIo.Season season) {
         LinearLayout col = Ui.newCard(this, results);
         Ui.addSectionTitle(this, col, getString(R.string.stagione) + ": " + season.name);
-        long effEnd = CutoffPredictor.effectiveEnd(season.startMs, season.endMs);
+        long effEnd = CutoffPredictor.effectiveEnd(season.slug, season.startMs, season.endMs);
         SimpleDateFormat fmt = new SimpleDateFormat("dd/MM/yyyy", Locale.ITALY);
         Ui.addRow(this, col, getString(R.string.periodo),
                 fmt.format(new Date(season.startMs)) + " – ~" + fmt.format(new Date(effEnd)), 0);

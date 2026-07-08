@@ -19,8 +19,8 @@ android {
         minSdk 26
         // targetSdk 34: evita l'edge-to-edge forzato di Android 15/16
         targetSdk 34
-        versionCode 8
-        versionName "2.6"
+        versionCode 9
+        versionName "2.7"
 
         buildConfigField "String", "WCL_CLIENT_ID",
                 "\"${secrets.getProperty('wcl.clientId', '')}\""
