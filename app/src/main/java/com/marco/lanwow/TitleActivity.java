@@ -68,15 +68,25 @@ public class TitleActivity extends AppCompatActivity {
             RaiderIo.Season season = null;
             JSONObject cutoffs = null;
             String error = null;
+            MplusTitle.Forecast forecast = null;
             try {
                 season = RaiderIo.fetchCurrentSeason(reg);
                 cutoffs = RaiderIo.fetchSeasonCutoffs(reg, season.slug);
             } catch (Exception e) {
                 error = e.getMessage();
             }
+            if (season != null) {
+                try {
+                    forecast = MplusTitle.fetch(reg,
+                            CutoffPredictor.knownEndIso(season.slug));
+                } catch (Exception ignored) {
+                    // il modello interno fa da riserva
+                }
+            }
             final RaiderIo.Season fSeason = season;
             final JSONObject fCutoffs = cutoffs;
             final String fError = error;
+            final MplusTitle.Forecast fForecast = forecast;
             main.post(() -> {
                 if (!reg.equals(region)) {
                     return;
@@ -94,7 +104,7 @@ public class TitleActivity extends AppCompatActivity {
                 showCurrent(fCutoffs, "p999", getString(R.string.top_01));
                 showCurrent(fCutoffs, "p990", getString(R.string.top_1));
                 showSeason(fSeason);
-                showPrediction(reg, fSeason, fCutoffs);
+                showPrediction(reg, fSeason, fCutoffs, fForecast);
             });
         }).start();
     }
@@ -175,7 +185,8 @@ public class TitleActivity extends AppCompatActivity {
     }
 
     /** Card finale con la previsione di fine stagione. */
-    private void showPrediction(String reg, RaiderIo.Season season, JSONObject cutoffs) {
+    private void showPrediction(String reg, RaiderIo.Season season, JSONObject cutoffs,
+                                MplusTitle.Forecast forecast) {
         LinearLayout col = Ui.newCard(this, results);
         Ui.addSectionTitle(this, col, getString(R.string.previsione_fine));
 
@@ -197,16 +208,27 @@ public class TitleActivity extends AppCompatActivity {
                 if (current <= 0) {
                     continue;
                 }
-                CutoffPredictor.Prediction pred = CutoffPredictor.predict(this, reg,
-                        season.slug, pctTitle[0] + "_" + f[0], current,
-                        season.startMs, season.endMs);
-                anyTrend |= pred.fromTrend;
+                double predicted;
+                if (forecast != null) {
+                    // fattore di crescita del sito applicato a ogni cutoff
+                    predicted = current * forecast.factor();
+                } else {
+                    CutoffPredictor.Prediction pred = CutoffPredictor.predict(this, reg,
+                            season.slug, pctTitle[0] + "_" + f[0], current,
+                            season.startMs, season.endMs);
+                    anyTrend |= pred.fromTrend;
+                    predicted = pred.value;
+                }
                 Ui.addRow(this, col, f[1],
-                        String.format(Locale.ITALY, "~%.0f", pred.value), safeColor(f[2]));
+                        String.format(Locale.ITALY, "~%.0f", predicted), safeColor(f[2]));
             }
         }
-        Ui.addText(this, col, getString(anyTrend
-                ? R.string.metodo_trend : R.string.metodo_fase), 12, 0, false);
+        if (forecast != null) {
+            Ui.addText(this, col, getString(R.string.metodo_sito), 12, 0, false);
+        } else {
+            Ui.addText(this, col, getString(anyTrend
+                    ? R.string.metodo_trend : R.string.metodo_fase), 12, 0, false);
+        }
         Ui.addText(this, col, getString(R.string.cutoff_note), 12, 0, false);
     }
 }

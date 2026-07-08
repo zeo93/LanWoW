@@ -31,13 +31,20 @@ public final class CutoffPredictor {
      */
     public static final long EFFECTIVE_SEASON_MS = 22L * 7 * 24 * 3600 * 1000;
 
-    /** Fine stagione nota o prevista per stagioni specifiche (0 = non nota). */
-    private static long knownEnd(String seasonSlug) {
+    /** Data di fine nota per stagioni specifiche in formato ISO (null = non nota). */
+    public static String knownEndIso(String seasonSlug) {
         if ("season-mn-1".equals(seasonSlug)) {
             // chiusura prevista: 11 agosto 2026
-            return java.time.Instant.parse("2026-08-11T00:00:00Z").toEpochMilli();
+            return "2026-08-11";
         }
-        return 0;
+        return null;
+    }
+
+    /** Fine stagione nota o prevista per stagioni specifiche (0 = non nota). */
+    private static long knownEnd(String seasonSlug) {
+        String iso = knownEndIso(seasonSlug);
+        return iso == null ? 0
+                : java.time.Instant.parse(iso + "T00:00:00Z").toEpochMilli();
     }
 
     /** Fine effettiva della stagione ai fini della previsione. */
