@@ -507,11 +507,12 @@ async function loadTitle(region) {
   out.innerHTML = spinner;
   try {
     const season = await currentSeason(region);
-    const [cutoffs, seasonCfg, forecastData] = await Promise.all([
+    const [cutoffsResp, seasonCfg, forecastData] = await Promise.all([
       rio.cutoffs(region, season.slug),
       getJson("data/season.json").catch(() => null),
       getJson("data/cutoff-forecast.json").catch(() => null),
     ]);
+    const cutoffs = cutoffsResp.cutoffs || {};
     const known = seasonCfg && seasonCfg.slug === season.slug
       ? Date.parse(seasonCfg.endDate + "T00:00:00Z") : 0;
     const effEnd = known ? Math.min(season.endMs, known)
