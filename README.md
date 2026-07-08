@@ -8,8 +8,13 @@ App Android per consultare i dati di un personaggio di World of Warcraft:
 
 ## Download
 
-Scarica l'ultima versione dalla pagina [Releases](https://github.com/zeo93/LanWoW/releases/latest).
+**Android**: scarica l'APK dalla pagina [Releases](https://github.com/zeo93/LanWoW/releases/latest).
 L'app controlla da sola gli aggiornamenti all'avvio e propone il download della nuova versione.
+
+**iPhone/iPad e browser**: usa la web app su **<https://zeo93.github.io/LanWoW/>** —
+su iOS aprila in Safari e scegli *Condividi → Aggiungi alla schermata Home* per installarla
+come app. Si aggiorna da sola a ogni apertura (il codice è in `docs/`, servito da GitHub Pages;
+la previsione del cutoff titolo viene rigenerata ogni giorno da una GitHub Action).
 
 ## Log di WarcraftLogs
 
