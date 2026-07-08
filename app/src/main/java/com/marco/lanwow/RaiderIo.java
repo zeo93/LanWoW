@@ -13,7 +13,7 @@ public final class RaiderIo {
 
     private static final String BASE = "https://raider.io/api/v1/characters/profile";
     private static final String FIELDS = "gear,guild,mythic_plus_scores_by_season:current,"
-            + "raid_progression,mythic_plus_best_runs,mythic_plus_recent_runs";
+            + "raid_progression,mythic_plus_best_runs,mythic_plus_recent_runs,mythic_plus_ranks";
 
     private RaiderIo() {
     }

@@ -1,7 +1,7 @@
 /* LanWoW web — stessa app Android in versione PWA. */
 "use strict";
 
-const VERSION = "2.8";
+const VERSION = "2.9";
 const REPO = "zeo93/LanWoW";
 const REGIONS = ["eu", "us", "kr", "tw"];
 
@@ -47,6 +47,27 @@ const CLASS_COLORS = {
 };
 const classColor = (cls) => CLASS_COLORS[(cls || "").toLowerCase()] || "#FFFFFF";
 
+const CLASS_IT = {
+  "warrior": ["Guerriero", "Guerrieri"], "paladin": ["Paladino", "Paladini"],
+  "hunter": ["Cacciatore", "Cacciatori"], "rogue": ["Ladro", "Ladri"],
+  "priest": ["Sacerdote", "Sacerdoti"],
+  "death knight": ["Cavaliere della Morte", "Cavalieri della Morte"],
+  "shaman": ["Sciamano", "Sciamani"], "mage": ["Mago", "Maghi"],
+  "warlock": ["Stregone", "Stregoni"], "monk": ["Monaco", "Monaci"],
+  "druid": ["Druido", "Druidi"],
+  "demon hunter": ["Cacciatore di Demoni", "Cacciatori di Demoni"],
+  "evoker": ["Evocatore", "Evocatori"],
+};
+const classIt = (cls, plural) =>
+  (CLASS_IT[(cls || "").toLowerCase()] || [cls, cls])[plural ? 1 : 0];
+
+function rankColor(rank) {
+  if (rank <= 10) return "#E5CC80";
+  if (rank <= 100) return "#A335EE";
+  if (rank <= 5000) return "#0070DD";
+  return "#1EFF00";
+}
+
 function parseColor(pct) {
   if (pct >= 100) return "#E5CC80";
   if (pct >= 99) return "#E268A8";
@@ -83,8 +104,8 @@ const rio = {
     getJson("https://raider.io/api/v1/characters/profile?region=" + region
       + "&realm=" + encodeURIComponent(realmSlug(realm))
       + "&name=" + encodeURIComponent(name.trim())
-      + "&fields=" + encodeURIComponent(
-        "gear,guild,mythic_plus_scores_by_season:current,raid_progression,mythic_plus_best_runs")),
+      + "&fields=" + encodeURIComponent("gear,guild,mythic_plus_scores_by_season:current,"
+        + "raid_progression,mythic_plus_best_runs,mythic_plus_ranks")),
   score: (region, realm, name) =>
     getJson("https://raider.io/api/v1/characters/profile?region=" + region
       + "&realm=" + encodeURIComponent(realm)
@@ -345,6 +366,27 @@ async function renderCharacter(region, realm, name) {
     mp += '<div class="muted">Nessuna run Mythic+ nella stagione corrente.</div>';
   }
   html += card(mp);
+
+  // classifica per classe/ruolo (mondo/regione/reame)
+  const ranks = p.mythic_plus_ranks || {};
+  const rankRows = [
+    ["class", "Tutti i " + classIt(p.class, true)],
+    ["class_tank", classIt(p.class, false) + " Difensori"],
+    ["class_healer", classIt(p.class, false) + " Guaritori"],
+    ["class_dps", classIt(p.class, false) + " DPS"],
+  ].filter(([k]) => ranks[k] && ranks[k].world > 0);
+  if (rankRows.length) {
+    html += card('<div class="section-title">Classifica</div>'
+      + '<div class="rank-row header"><span class="rank-label"></span>'
+      + '<span>Tutte le regioni</span><span>Regione</span><span>Reame</span></div>'
+      + rankRows.map(([k, label]) => {
+        const r = ranks[k];
+        const cell = (v) =>
+          `<span style="color:${rankColor(v)}">${fmt0(v)}</span>`;
+        return `<div class="rank-row"><span class="rank-label">${esc(label)}</span>`
+          + cell(r.world) + cell(r.region) + cell(r.realm) + "</div>";
+      }).join(""));
+  }
 
   const raids = p.raid_progression || {};
   const raidKeys = Object.keys(raids);

@@ -60,6 +60,15 @@
     <string name="migliori_run">Migliori run</string>
     <string name="nessuna_run">Nessuna run Mythic+ nella stagione corrente.</string>
 
+    <!-- Classifica -->
+    <string name="classifica">Classifica</string>
+    <string name="classifica_tutti">Tutti i %s</string>
+    <string name="ruolo_difensori">Difensori</string>
+    <string name="ruolo_guaritori">Guaritori</string>
+    <string name="colonna_mondo">Tutte le regioni</string>
+    <string name="colonna_regione">Regione</string>
+    <string name="colonna_reame">Reame</string>
+
     <!-- Raid -->
     <string name="progressione_raid">Progressione raid</string>
 

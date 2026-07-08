@@ -149,6 +149,7 @@ public class CharacterActivity extends AppCompatActivity {
                 refreshStar();
                 showProfile(fProfile);
                 showMythicPlus(fProfile);
+                showRanks(fProfile);
                 showRaids(fProfile);
                 logsButton.setVisibility(View.VISIBLE);
             });
@@ -231,6 +232,125 @@ public class CharacterActivity extends AppCompatActivity {
             }
         } else if (score == 0) {
             Ui.addText(this, col, getString(R.string.nessuna_run), 14, 0, false);
+        }
+    }
+
+    /** Classifica del punteggio M+ (mondo/regione/reame) per classe e ruolo. */
+    private void showRanks(JSONObject o) {
+        JSONObject ranks = o.optJSONObject("mythic_plus_ranks");
+        if (ranks == null) {
+            return;
+        }
+        String cls = o.optString("class");
+        String[][] rows = {
+                {"class", getString(R.string.classifica_tutti, classPlural(cls))},
+                {"class_tank", classSingular(cls) + " " + getString(R.string.ruolo_difensori)},
+                {"class_healer", classSingular(cls) + " " + getString(R.string.ruolo_guaritori)},
+                {"class_dps", classSingular(cls) + " DPS"},
+        };
+
+        LinearLayout col = null;
+        for (String[] r : rows) {
+            JSONObject rank = ranks.optJSONObject(r[0]);
+            if (rank == null || rank.optInt("world", 0) <= 0) {
+                continue;
+            }
+            if (col == null) {
+                col = Ui.newCard(this, results);
+                Ui.addSectionTitle(this, col, getString(R.string.classifica));
+                addRankRow(col, "", getString(R.string.colonna_mondo),
+                        getString(R.string.colonna_regione), getString(R.string.colonna_reame),
+                        true, 0, 0, 0);
+            }
+            addRankRow(col, r[1],
+                    String.format(Locale.ITALY, "%,d", rank.optInt("world")),
+                    String.format(Locale.ITALY, "%,d", rank.optInt("region")),
+                    String.format(Locale.ITALY, "%,d", rank.optInt("realm")),
+                    false,
+                    rankColor(rank.optInt("world")),
+                    rankColor(rank.optInt("region")),
+                    rankColor(rank.optInt("realm")));
+        }
+    }
+
+    private void addRankRow(LinearLayout parent, String label, String v1, String v2, String v3,
+                            boolean header, int c1, int c2, int c3) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, Ui.dp(this, 3), 0, Ui.dp(this, 3));
+
+        android.widget.TextView l = new android.widget.TextView(this);
+        l.setText(label);
+        l.setTextSize(header ? 12 : 14);
+        l.setLayoutParams(new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(l);
+
+        String[] values = {v1, v2, v3};
+        int[] colors = {c1, c2, c3};
+        for (int i = 0; i < 3; i++) {
+            android.widget.TextView v = new android.widget.TextView(this);
+            v.setText(values[i]);
+            v.setTextSize(header ? 12 : 14);
+            v.setMinWidth(Ui.dp(this, i == 0 ? 88 : 68));
+            v.setGravity(android.view.Gravity.END);
+            if (header) {
+                v.setTextColor(0xFF9AA3B8);
+            } else {
+                v.setTypeface(null, android.graphics.Typeface.BOLD);
+                if (colors[i] != 0) {
+                    v.setTextColor(colors[i]);
+                }
+            }
+            row.addView(v);
+        }
+        parent.addView(row);
+    }
+
+    /** Colore del rank per fascia, come su raider.io. */
+    private static int rankColor(int rank) {
+        if (rank <= 0) return 0;
+        if (rank <= 10) return 0xFFE5CC80;
+        if (rank <= 100) return 0xFFA335EE;
+        if (rank <= 5000) return 0xFF0070DD;
+        return 0xFF1EFF00;
+    }
+
+    private static String classSingular(String cls) {
+        switch (cls == null ? "" : cls.toLowerCase()) {
+            case "warrior": return "Guerriero";
+            case "paladin": return "Paladino";
+            case "hunter": return "Cacciatore";
+            case "rogue": return "Ladro";
+            case "priest": return "Sacerdote";
+            case "death knight": return "Cavaliere della Morte";
+            case "shaman": return "Sciamano";
+            case "mage": return "Mago";
+            case "warlock": return "Stregone";
+            case "monk": return "Monaco";
+            case "druid": return "Druido";
+            case "demon hunter": return "Cacciatore di Demoni";
+            case "evoker": return "Evocatore";
+            default: return cls;
+        }
+    }
+
+    private static String classPlural(String cls) {
+        switch (cls == null ? "" : cls.toLowerCase()) {
+            case "warrior": return "Guerrieri";
+            case "paladin": return "Paladini";
+            case "hunter": return "Cacciatori";
+            case "rogue": return "Ladri";
+            case "priest": return "Sacerdoti";
+            case "death knight": return "Cavalieri della Morte";
+            case "shaman": return "Sciamani";
+            case "mage": return "Maghi";
+            case "warlock": return "Stregoni";
+            case "monk": return "Monaci";
+            case "druid": return "Druidi";
+            case "demon hunter": return "Cacciatori di Demoni";
+            case "evoker": return "Evocatori";
+            default: return cls;
         }
     }
 
