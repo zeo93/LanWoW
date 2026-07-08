@@ -90,12 +90,11 @@ public class TitleActivity extends AppCompatActivity {
                     return;
                 }
                 saveSnapshot(reg, fSeason, fCutoffs);
+                // in alto i dati attuali di raider.io, in basso la previsione
+                showCurrent(fCutoffs, "p999", getString(R.string.top_01));
+                showCurrent(fCutoffs, "p990", getString(R.string.top_1));
                 showSeason(fSeason);
-                showPercentile(reg, fSeason, fCutoffs, "p999",
-                        getString(R.string.top_01));
-                showPercentile(reg, fSeason, fCutoffs, "p990",
-                        getString(R.string.top_1));
-                showNotes(fSeason);
+                showPrediction(reg, fSeason, fCutoffs);
             });
         }).start();
     }
@@ -121,34 +120,31 @@ public class TitleActivity extends AppCompatActivity {
         }
     }
 
-    private void showSeason(RaiderIo.Season season) {
-        LinearLayout col = Ui.newCard(this, results);
-        Ui.addSectionTitle(this, col, getString(R.string.stagione) + ": " + season.name);
-        SimpleDateFormat fmt = new SimpleDateFormat("dd/MM/yyyy", Locale.ITALY);
-        Ui.addRow(this, col, getString(R.string.periodo),
-                fmt.format(new Date(season.startMs)) + " – " + fmt.format(new Date(season.endMs)), 0);
-        double t = (double) (System.currentTimeMillis() - season.startMs)
-                / (season.endMs - season.startMs);
-        Ui.addRow(this, col, getString(R.string.avanzamento),
-                String.format(Locale.ITALY, "%.0f%%", t * 100), getColor(R.color.gold));
+    private String[][] factions(JSONObject block) {
+        return new String[][]{
+                {"horde", getString(R.string.orda), block.optString("hordeColor", "")},
+                {"alliance", getString(R.string.alleanza), block.optString("allianceColor", "")},
+                {"all", getString(R.string.tutti), block.optString("allColor", "")},
+        };
     }
 
-    private void showPercentile(String reg, RaiderIo.Season season, JSONObject cutoffs,
-                                String pct, String title) {
+    private static int safeColor(String hex) {
+        try {
+            return hex.isEmpty() ? 0 : Color.parseColor(hex);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    /** Card con i cutoff attuali presi da raider.io. */
+    private void showCurrent(JSONObject cutoffs, String pct, String title) {
         JSONObject block = cutoffs.optJSONObject(pct);
         if (block == null) {
             return;
         }
         LinearLayout col = Ui.newCard(this, results);
         Ui.addSectionTitle(this, col, title);
-
-        boolean anyTrend = false;
-        String[][] factions = {
-                {"horde", getString(R.string.orda), block.optString("hordeColor", "")},
-                {"alliance", getString(R.string.alleanza), block.optString("allianceColor", "")},
-                {"all", getString(R.string.tutti), block.optString("allColor", "")},
-        };
-        for (String[] f : factions) {
+        for (String[] f : factions(block)) {
             JSONObject data = block.optJSONObject(f[0]);
             if (data == null) {
                 continue;
@@ -157,25 +153,60 @@ public class TitleActivity extends AppCompatActivity {
             if (current <= 0) {
                 continue;
             }
-            CutoffPredictor.Prediction pred = CutoffPredictor.predict(this, reg, season.slug,
-                    pct + "_" + f[0], current, season.startMs, season.endMs);
-            anyTrend |= pred.fromTrend;
-            int color = 0;
-            try {
-                if (!f[2].isEmpty()) {
-                    color = Color.parseColor(f[2]);
-                }
-            } catch (Exception ignored) {
-            }
             Ui.addRow(this, col, f[1],
-                    String.format(Locale.ITALY, "%.0f  →  ~%.0f", current, pred.value), color);
+                    String.format(Locale.ITALY, "%.0f", current), safeColor(f[2]));
+        }
+    }
+
+    private void showSeason(RaiderIo.Season season) {
+        LinearLayout col = Ui.newCard(this, results);
+        Ui.addSectionTitle(this, col, getString(R.string.stagione) + ": " + season.name);
+        long effEnd = CutoffPredictor.effectiveEnd(season.startMs, season.endMs);
+        SimpleDateFormat fmt = new SimpleDateFormat("dd/MM/yyyy", Locale.ITALY);
+        Ui.addRow(this, col, getString(R.string.periodo),
+                fmt.format(new Date(season.startMs)) + " – ~" + fmt.format(new Date(effEnd)), 0);
+        long now = System.currentTimeMillis();
+        int week = (int) ((now - season.startMs) / (7L * 24 * 3600 * 1000)) + 1;
+        int totalWeeks = (int) Math.round((effEnd - season.startMs)
+                / (7.0 * 24 * 3600 * 1000));
+        Ui.addRow(this, col, getString(R.string.avanzamento),
+                getString(R.string.settimana_di, Math.min(week, totalWeeks), totalWeeks),
+                getColor(R.color.gold));
+    }
+
+    /** Card finale con la previsione di fine stagione. */
+    private void showPrediction(String reg, RaiderIo.Season season, JSONObject cutoffs) {
+        LinearLayout col = Ui.newCard(this, results);
+        Ui.addSectionTitle(this, col, getString(R.string.previsione_fine));
+
+        boolean anyTrend = false;
+        for (String[] pctTitle : new String[][]{
+                {"p999", getString(R.string.top_01)},
+                {"p990", getString(R.string.top_1)}}) {
+            JSONObject block = cutoffs.optJSONObject(pctTitle[0]);
+            if (block == null) {
+                continue;
+            }
+            Ui.addText(this, col, pctTitle[1], 15, getColor(R.color.gold), true);
+            for (String[] f : factions(block)) {
+                JSONObject data = block.optJSONObject(f[0]);
+                if (data == null) {
+                    continue;
+                }
+                double current = data.optDouble("quantileMinValue", 0);
+                if (current <= 0) {
+                    continue;
+                }
+                CutoffPredictor.Prediction pred = CutoffPredictor.predict(this, reg,
+                        season.slug, pctTitle[0] + "_" + f[0], current,
+                        season.startMs, season.endMs);
+                anyTrend |= pred.fromTrend;
+                Ui.addRow(this, col, f[1],
+                        String.format(Locale.ITALY, "~%.0f", pred.value), safeColor(f[2]));
+            }
         }
         Ui.addText(this, col, getString(anyTrend
                 ? R.string.metodo_trend : R.string.metodo_fase), 12, 0, false);
-    }
-
-    private void showNotes(RaiderIo.Season season) {
-        LinearLayout col = Ui.newCard(this, results);
-        Ui.addText(this, col, getString(R.string.cutoff_note), 13, 0, false);
+        Ui.addText(this, col, getString(R.string.cutoff_note), 12, 0, false);
     }
 }

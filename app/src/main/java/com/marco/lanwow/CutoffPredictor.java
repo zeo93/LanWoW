@@ -25,6 +25,16 @@ public final class CutoffPredictor {
     private static final double DAY_MS = 24.0 * 3600 * 1000;
     /** La crescita osservata viene proiettata al 80%: verso fine stagione rallenta. */
     private static final double DAMPING = 0.8;
+    /**
+     * Durata competitiva effettiva di una stagione M+ (~22 settimane): la data di fine
+     * "ufficiale" nelle API arriva fino alla stagione successiva ed è molto più lunga.
+     */
+    public static final long EFFECTIVE_SEASON_MS = 22L * 7 * 24 * 3600 * 1000;
+
+    /** Fine effettiva della stagione ai fini della previsione. */
+    public static long effectiveEnd(long seasonStart, long seasonEnd) {
+        return Math.min(seasonEnd, seasonStart + EFFECTIVE_SEASON_MS);
+    }
 
     /** Risultato: valore previsto e metodo usato. */
     public static class Prediction {
@@ -71,6 +81,7 @@ public final class CutoffPredictor {
                                      double current, long seasonStart, long seasonEnd) {
         Prediction out = new Prediction();
         long now = System.currentTimeMillis();
+        seasonEnd = effectiveEnd(seasonStart, seasonEnd);
 
         // 1) regressione lineare sugli snapshot locali, se bastano
         List<long[]> raw = new ArrayList<>();

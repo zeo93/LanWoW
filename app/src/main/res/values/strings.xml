@@ -19,6 +19,8 @@
     <string name="stagione">Stagione</string>
     <string name="periodo">Periodo</string>
     <string name="avanzamento">Avanzamento stagione</string>
+    <string name="settimana_di">Settimana %1$d di ~%2$d</string>
+    <string name="previsione_fine">Previsione fine stagione</string>
     <string name="top_01">Top 0,1% — Titolo</string>
     <string name="top_1">Top 1%</string>
     <string name="orda_label">Orda</string>
