@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LanWoW</title>
+<meta name="theme-color" content="#121826">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="LanWoW">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <button id="btn-back" class="icon-btn" title="Indietro" hidden>&#8592;</button>
+  <h1 id="header-title">LanWoW</h1>
+  <div class="header-actions">
+    <button id="btn-title" class="icon-btn gold" title="Titolo M+">T</button>
+    <button id="btn-favs" class="icon-btn gold" title="Preferiti">&#9733;</button>
+  </div>
+</header>
+<div id="update-banner" hidden>
+  <div>
+    <b id="update-title"></b>
+    <div id="update-body"></div>
+  </div>
+  <button id="update-reload">Aggiorna</button>
+</div>
+<main id="view"></main>
+<footer>LanWoW <span id="footer-version"></span> — dati da raider.io e warcraftlogs.com</footer>
+<script src="app.js"></script>
+</body>
+</html>
