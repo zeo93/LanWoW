@@ -1,7 +1,7 @@
 /* LanWoW web — stessa app Android in versione PWA. */
 "use strict";
 
-const VERSION = "2.9";
+const VERSION = "2.10";
 const REPO = "zeo93/LanWoW";
 const REGIONS = ["eu", "us", "kr", "tw"];
 
@@ -9,9 +9,11 @@ const REGIONS = ["eu", "us", "kr", "tw"];
 const WCL_CLIENT_ID = "019f42cb-052d-72b1-ab62-4995e8a4127c";
 const WCL_CLIENT_SECRET = "693GmRQris7L2FO1gsA37hhEEPQcrAsYy8spRk4U";
 
+// [etichetta, metrica, byBracket] — byBracket = parse per livello di chiave
 const METRICS = [
-  ["Predefinita", null], ["DPS", "dps"], ["HPS", "hps"],
-  ["Boss DPS", "bossdps"], ["Punteggio M+", "playerscore"],
+  ["Predefinita", null, false], ["DPS", "dps", false], ["HPS", "hps", false],
+  ["Boss DPS", "bossdps", false], ["Punteggio M+", "playerscore", false],
+  ["DPS per livello chiave", "dps", true], ["HPS per livello chiave", "hps", true],
 ];
 
 const view = document.getElementById("view");
@@ -182,16 +184,17 @@ async function wclExpansions() {
   return exps;
 }
 
-function wclRankings(region, realm, name, zoneId, difficulty, metric) {
+function wclRankings(region, realm, name, zoneId, difficulty, metric, byBracket) {
   const vars = { name: name.trim(), server: realm, region };
   if (zoneId) vars.zone = zoneId;
   if (difficulty) vars.difficulty = difficulty;
   if (metric) vars.metric = metric;
+  if (byBracket) vars.bracket = true;
   return wclQuery(
     "query($name:String!,$server:String!,$region:String!,$zone:Int,$difficulty:Int,"
-    + "$metric:CharacterPageRankingMetricType){characterData{"
+    + "$metric:CharacterPageRankingMetricType,$bracket:Boolean){characterData{"
     + "character(name:$name,serverSlug:$server,serverRegion:$region){name zoneRankings("
-    + "zoneID:$zone,difficulty:$difficulty,metric:$metric)}}}", vars)
+    + "zoneID:$zone,difficulty:$difficulty,metric:$metric,byBracket:$bracket)}}}", vars)
     .then((data) => {
       const ch = data.characterData && data.characterData.character;
       if (!ch || ch.zoneRankings == null) {
@@ -463,7 +466,8 @@ async function renderLogs(region, realm, name) {
     </div>`)
     + '<div id="logs-out"></div>';
 
-  const state = { zones: [], zoneId: 0, zoneName: "", difficulty: 0, metric: null, seq: 0 };
+  const state = { zones: [], zoneId: 0, zoneName: "", difficulty: 0,
+    metric: null, bracket: false, seq: 0 };
 
   const fillZones = (expIndex) => {
     state.zones = (exps[expIndex].zones || [])
@@ -489,7 +493,8 @@ async function renderLogs(region, realm, name) {
     out.innerHTML = spinner;
     try {
       const r = await wclRankings(region, decodeURIComponent(realm),
-        decodeURIComponent(name), state.zoneId, state.difficulty, state.metric);
+        decodeURIComponent(name), state.zoneId, state.difficulty,
+        state.metric, state.bracket);
       if (seq !== state.seq) return;
       let html = `<div class="section-title">${esc(state.zoneName)}</div>`;
       if (r.bestPerformanceAverage != null) {
@@ -525,7 +530,11 @@ async function renderLogs(region, realm, name) {
   $("#f-exp").onchange = (e) => fillZones(+e.target.value);
   $("#f-zone").onchange = (e) => fillDiffs(+e.target.value);
   $("#f-diff").onchange = (e) => { state.difficulty = +e.target.value; load(); };
-  $("#f-metric").onchange = (e) => { state.metric = METRICS[+e.target.value][1]; load(); };
+  $("#f-metric").onchange = (e) => {
+    state.metric = METRICS[+e.target.value][1];
+    state.bracket = METRICS[+e.target.value][2];
+    load();
+  };
   fillZones(0);
 }
 

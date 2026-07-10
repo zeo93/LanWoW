@@ -49,12 +49,16 @@ public class LogsActivity extends AppCompatActivity {
     private int selectedZoneId;
     private String selectedZoneName = "";
     private int selectedDifficulty;
-    private String selectedMetric;
+    private int selectedMetricIdx;
 
     private static final String[] METRIC_LABELS = {
-            "Predefinita", "DPS", "HPS", "Boss DPS", "Punteggio M+"};
+            "Predefinita", "DPS", "HPS", "Boss DPS", "Punteggio M+",
+            "DPS per livello chiave", "HPS per livello chiave"};
     private static final String[] METRIC_VALUES = {
-            null, "dps", "hps", "bossdps", "playerscore"};
+            null, "dps", "hps", "bossdps", "playerscore", "dps", "hps"};
+    /** true dove il parse va calcolato per livello di chiave (byBracket). */
+    private static final boolean[] METRIC_BRACKET = {
+            false, false, false, false, false, true, true};
 
     public static void open(Activity from, String region, String realmSlug, String name) {
         Intent i = new Intent(from, LogsActivity.class)
@@ -100,7 +104,7 @@ public class LogsActivity extends AppCompatActivity {
                 android.R.layout.simple_list_item_1, METRIC_LABELS));
         metricInput.setText(METRIC_LABELS[0], false);
         metricInput.setOnItemClickListener((p, v, pos, id) -> {
-            selectedMetric = METRIC_VALUES[pos];
+            selectedMetricIdx = pos;
             reload();
         });
 
@@ -208,14 +212,15 @@ public class LogsActivity extends AppCompatActivity {
         results.removeAllViews();
         final int zoneId = selectedZoneId;
         final int difficulty = selectedDifficulty;
-        final String metric = selectedMetric;
+        final int metricIdx = selectedMetricIdx;
 
         new Thread(() -> {
             JSONObject rankings = null;
             String error = null;
             try {
                 rankings = WarcraftLogs.fetchRankings(this, region, realmSlug, name,
-                        zoneId, difficulty, metric);
+                        zoneId, difficulty, METRIC_VALUES[metricIdx],
+                        METRIC_BRACKET[metricIdx]);
             } catch (Exception e) {
                 error = e.getMessage();
             }
@@ -223,10 +228,8 @@ public class LogsActivity extends AppCompatActivity {
             final String fError = error;
             main.post(() -> {
                 // scarta le risposte di selezioni ormai superate
-                boolean sameMetric = metric == null
-                        ? selectedMetric == null : metric.equals(selectedMetric);
                 if (zoneId != selectedZoneId || difficulty != selectedDifficulty
-                        || !sameMetric) {
+                        || metricIdx != selectedMetricIdx) {
                     return;
                 }
                 progress.setVisibility(View.GONE);

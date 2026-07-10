@@ -144,14 +144,17 @@ public final class WarcraftLogs {
      * @param zoneId     zona (raid o stagione M+); 0 = zona predefinita
      * @param difficulty id difficoltà; 0 = predefinita
      * @param metric     dps, hps, bossdps, playerscore…; null = predefinita
+     * @param byBracket  true = parse calcolati per livello di chiave ("by level")
      */
     public static JSONObject fetchRankings(Context c, String region, String realmSlug,
                                            String name, int zoneId, int difficulty,
-                                           String metric) throws Exception {
+                                           String metric, boolean byBracket) throws Exception {
         String query = "query($name:String!,$server:String!,$region:String!,"
-                + "$zone:Int,$difficulty:Int,$metric:CharacterPageRankingMetricType){"
+                + "$zone:Int,$difficulty:Int,$metric:CharacterPageRankingMetricType,"
+                + "$bracket:Boolean){"
                 + "characterData{character(name:$name,serverSlug:$server,serverRegion:$region){"
-                + "name zoneRankings(zoneID:$zone,difficulty:$difficulty,metric:$metric)}}}";
+                + "name zoneRankings(zoneID:$zone,difficulty:$difficulty,metric:$metric,"
+                + "byBracket:$bracket)}}}";
         JSONObject variables = new JSONObject()
                 .put("name", name.trim())
                 .put("server", realmSlug)
@@ -164,6 +167,9 @@ public final class WarcraftLogs {
         }
         if (metric != null && !metric.isEmpty()) {
             variables.put("metric", metric);
+        }
+        if (byBracket) {
+            variables.put("bracket", true);
         }
         JSONObject data = graphql(c, query, variables);
         JSONObject characterData = data.optJSONObject("characterData");
