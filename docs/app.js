@@ -1,7 +1,7 @@
 /* LanWoW web — stessa app Android in versione PWA. */
 "use strict";
 
-const VERSION = "2.11";
+const VERSION = "2.12";
 const REPO = "zeo93/LanWoW";
 const REGIONS = ["eu", "us", "kr", "tw"];
 
@@ -176,12 +176,29 @@ async function wclQuery(query, variables) {
 }
 
 async function wclExpansions() {
-  const cached = store.get("wcl_expansions");
+  // "wcl_expansions2": la v1 della cache non conteneva gli encounter
+  const cached = store.get("wcl_expansions2");
   if (cached && Date.now() - cached.ts < 86400e3) return cached.data;
-  const data = await wclQuery("{worldData{expansions{id name zones{id name difficulties{id name}}}}}");
+  const data = await wclQuery("{worldData{expansions{id name zones{id name "
+    + "difficulties{id name} encounters{id name}}}}}");
   const exps = data.worldData.expansions;
-  store.set("wcl_expansions", { ts: Date.now(), data: exps });
+  store.set("wcl_expansions2", { ts: Date.now(), data: exps });
   return exps;
+}
+
+/** Dati "by level" per encounter in una sola query con alias: run a punteggio
+    (p<id>, per trovare la run migliore come sul sito) + parse per livello (d<id>). */
+async function wclByLevel(region, realm, name, encounters, metric) {
+  const fields = encounters.map((e) =>
+    `p${e.id}:encounterRankings(encounterID:${e.id},metric:playerscore) `
+    + `d${e.id}:encounterRankings(encounterID:${e.id},metric:${metric},byBracket:true)`).join(" ");
+  const data = await wclQuery(
+    "query($name:String!,$server:String!,$region:String!){characterData{"
+    + `character(name:$name,serverSlug:$server,serverRegion:$region){${fields}}}}`,
+    { name: name.trim(), server: realm, region });
+  const ch = data.characterData && data.characterData.character;
+  if (!ch) throw new Error("personaggio non trovato su WarcraftLogs (o profilo nascosto)");
+  return ch;
 }
 
 function wclRankings(region, realm, name, zoneId, difficulty, metric, byBracket) {
@@ -481,20 +498,99 @@ async function renderLogs(region, realm, name) {
     if (!z) { $("#logs-out").innerHTML = ""; return; }
     state.zoneId = z.id;
     state.zoneName = z.name;
+    state.zone = z;
     const diffs = z.difficulties || [];
     $("#f-diff").innerHTML = '<option value="0">Predefinita</option>'
       + diffs.map((d) => `<option value="${d.id}">${esc(d.name)}</option>`).join("");
     state.difficulty = 0;
     load();
   };
+  const median = (arr) => {
+    if (!arr.length) return 0;
+    const s = [...arr].sort((a, b) => a - b);
+    const n = s.length;
+    return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+  };
+  const fmtAmount = (a) => a >= 1e6
+    ? (a / 1e6).toLocaleString("it-IT", { maximumFractionDigits: 1 }) + "M"
+    : (a / 1e3).toLocaleString("it-IT", { maximumFractionDigits: 1 }) + "K";
+
+  /** Tabella "by level" come sul sito: la run che vale più punteggio M+ determina
+      il livello; best % e mediana sono calcolati sulle run di quel livello. */
+  const renderByLevel = (encs, ch) => {
+    let html = `<div class="section-title">${esc(state.zoneName)}</div>`;
+    const rows = [];
+    let sumBest = 0, sumMed = 0, count = 0;
+    for (const e of encs) {
+      const scoreRanks = (ch["p" + e.id] && ch["p" + e.id].ranks) || [];
+      const dpsRanks = (ch["d" + e.id] && ch["d" + e.id].ranks) || [];
+      // livello della run che vale più punteggio (quella "contata" dal gioco)
+      let level = 0, bestPoints = -1;
+      for (const r of scoreRanks) {
+        if ((r.amount || 0) > bestPoints) {
+          bestPoints = r.amount || 0;
+          level = r.bracketData || 0;
+        }
+      }
+      const top = dpsRanks.filter((r) => (r.bracketData || 0) === level);
+      if (!level || !top.length) {
+        rows.push({ name: e.name });
+        continue;
+      }
+      let best = -1, bestAmount = 0;
+      const pcts = [];
+      for (const r of top) {
+        const pct = r.rankPercent || 0;
+        pcts.push(pct);
+        if (pct >= best) { best = pct; bestAmount = r.amount || 0; }
+      }
+      const med = median(pcts);
+      sumBest += best; sumMed += med; count++;
+      rows.push({ name: e.name, level, amount: bestAmount, best, med });
+    }
+    if (!count) {
+      return card(html + '<div class="muted">Nessun log trovato per questa selezione.</div>');
+    }
+    html += row("Media best perf.", fmt1(sumBest / count), parseColor(sumBest / count));
+    html += row("Media mediana", fmt1(sumMed / count), parseColor(sumMed / count));
+    html += '<div class="level-row header"><span class="level-label"></span>'
+      + "<span>Chiave</span><span>Best</span><span>Best %</span><span>Med %</span></div>";
+    for (const r of rows) {
+      if (!r.level) {
+        html += `<div class="level-row"><span class="level-label">${esc(r.name)}</span>`
+          + "<span>—</span><span>—</span><span>—</span><span>—</span></div>";
+        continue;
+      }
+      html += `<div class="level-row"><span class="level-label">${esc(r.name)}</span>`
+        + `<span>+${r.level}</span>`
+        + `<span>${fmtAmount(r.amount)}</span>`
+        + `<span style="color:${parseColor(r.best)}">${Math.floor(r.best)}</span>`
+        + `<span style="color:${parseColor(r.med)}">${Math.floor(r.med)}</span></div>`;
+    }
+    return card(html);
+  };
+
   const load = async () => {
     const seq = ++state.seq;
     const out = $("#logs-out");
     out.innerHTML = spinner;
     try {
+      if (state.bracket) {
+        const encs = ((state.zone && state.zone.encounters) || [])
+          .filter((e) => e.id > 0);
+        if (!encs.length) {
+          out.innerHTML = card('<div class="muted">Nessun log trovato per questa selezione.</div>');
+          return;
+        }
+        const ch = await wclByLevel(region, decodeURIComponent(realm),
+          decodeURIComponent(name), encs, state.metric);
+        if (seq !== state.seq) return;
+        out.innerHTML = renderByLevel(encs, ch);
+        return;
+      }
       const r = await wclRankings(region, decodeURIComponent(realm),
         decodeURIComponent(name), state.zoneId, state.difficulty,
-        state.metric, state.bracket);
+        state.metric, false);
       if (seq !== state.seq) return;
       let html = `<div class="section-title">${esc(state.zoneName)}</div>`;
       if (r.bestPerformanceAverage != null) {
@@ -508,39 +604,6 @@ async function renderLogs(region, realm, name) {
       const list = r.rankings || [];
       if (!list.length) {
         html += '<div class="muted">Nessun log trovato per questa selezione.</div>';
-      }
-      if (state.bracket && list.length) {
-        // tabella "by level" come sul sito: chiave, best DPS/HPS, best %, median %
-        const fmtAmount = (a) => a >= 1e6
-          ? (a / 1e6).toLocaleString("it-IT", { maximumFractionDigits: 1 }) + "M"
-          : (a / 1e3).toLocaleString("it-IT", { maximumFractionDigits: 1 }) + "K";
-        html += '<div class="level-row header"><span class="level-label"></span>'
-          + "<span>Chiave</span><span>Best</span><span>Best %</span><span>Med %</span></div>";
-        for (const it of list) {
-          const boss = esc(it.encounter ? it.encounter.name : "?");
-          const bestAmount = it.bestAmount || 0;
-          if (bestAmount <= 0) {
-            html += `<div class="level-row"><span class="level-label">${boss}</span>`
-              + "<span>—</span><span>—</span><span>—</span><span>—</span></div>";
-            continue;
-          }
-          // nelle zone M+ bestAmount codifica livello e valore: livello*20M + DPS
-          let level = 0;
-          let amount = bestAmount;
-          if (bestAmount >= 40e6) {
-            level = Math.floor(bestAmount / 20e6);
-            amount = bestAmount - level * 20e6;
-          }
-          const best = it.rankPercent || 0;
-          const median = it.medianPercent || 0;
-          html += `<div class="level-row"><span class="level-label">${boss}</span>`
-            + `<span>${level > 0 ? "+" + level : "—"}</span>`
-            + `<span>${fmtAmount(amount)}</span>`
-            + `<span style="color:${parseColor(best)}">${Math.floor(best)}</span>`
-            + `<span style="color:${parseColor(median)}">${Math.floor(median)}</span></div>`;
-        }
-        out.innerHTML = card(html);
-        return;
       }
       for (const it of list) {
         const boss = it.encounter ? it.encounter.name : "?";

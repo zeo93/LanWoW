@@ -175,8 +175,11 @@ public class LogsActivity extends AppCompatActivity {
         }
     }
 
+    private JSONObject selectedZone;
+
     private void selectZone(int index) {
         JSONObject z = zones.get(index);
+        selectedZone = z;
         selectedZoneId = z.optInt("id");
         selectedZoneName = z.optString("name");
 
@@ -214,13 +217,16 @@ public class LogsActivity extends AppCompatActivity {
         final int difficulty = selectedDifficulty;
         final int metricIdx = selectedMetricIdx;
 
+        if (METRIC_BRACKET[metricIdx]) {
+            reloadByLevel(zoneId, difficulty, metricIdx);
+            return;
+        }
         new Thread(() -> {
             JSONObject rankings = null;
             String error = null;
             try {
                 rankings = WarcraftLogs.fetchRankings(this, region, realmSlug, name,
-                        zoneId, difficulty, METRIC_VALUES[metricIdx],
-                        METRIC_BRACKET[metricIdx]);
+                        zoneId, difficulty, METRIC_VALUES[metricIdx], false);
             } catch (Exception e) {
                 error = e.getMessage();
             }
@@ -235,6 +241,47 @@ public class LogsActivity extends AppCompatActivity {
                 progress.setVisibility(View.GONE);
                 results.removeAllViews();
                 showRankings(fRankings, fError);
+            });
+        }).start();
+    }
+
+    /** Vista "by level": run singole per encounter, poi chiave più alta completata. */
+    private void reloadByLevel(int zoneId, int difficulty, int metricIdx) {
+        final JSONObject zone = selectedZone;
+        final java.util.List<int[]> ids = new ArrayList<>();
+        final java.util.LinkedHashMap<Integer, String> names = new java.util.LinkedHashMap<>();
+        JSONArray encs = zone != null ? zone.optJSONArray("encounters") : null;
+        if (encs != null) {
+            for (int i = 0; i < encs.length(); i++) {
+                JSONObject e = encs.optJSONObject(i);
+                if (e != null && e.optInt("id", 0) > 0) {
+                    ids.add(new int[]{e.optInt("id")});
+                    names.put(e.optInt("id"), e.optString("name"));
+                }
+            }
+        }
+        new Thread(() -> {
+            JSONObject data = null;
+            String error = null;
+            try {
+                if (ids.isEmpty()) {
+                    throw new Exception(getString(R.string.wcl_nessun_log));
+                }
+                data = WarcraftLogs.fetchByLevel(this, region, realmSlug, name,
+                        ids, METRIC_VALUES[metricIdx]);
+            } catch (Exception e) {
+                error = e.getMessage();
+            }
+            final JSONObject fData = data;
+            final String fError = error;
+            main.post(() -> {
+                if (zoneId != selectedZoneId || difficulty != selectedDifficulty
+                        || metricIdx != selectedMetricIdx) {
+                    return;
+                }
+                progress.setVisibility(View.GONE);
+                results.removeAllViews();
+                showByLevel(fData, names, fError);
             });
         }).start();
     }
@@ -262,10 +309,6 @@ public class LogsActivity extends AppCompatActivity {
             Ui.addText(this, col, getString(R.string.wcl_nessun_log), 14, 0, false);
             return;
         }
-        if (METRIC_BRACKET[selectedMetricIdx]) {
-            showByLevelTable(col, list);
-            return;
-        }
         boolean any = false;
         for (int i = 0; i < list.length(); i++) {
             JSONObject r = list.optJSONObject(i);
@@ -288,37 +331,113 @@ public class LogsActivity extends AppCompatActivity {
     }
 
     /**
-     * Tabella "by level" come sul sito: chiave, best DPS/HPS, best % e median %.
-     * Nelle zone M+ bestAmount codifica livello e valore: livello*20M + DPS.
+     * Tabella "by level" come sul sito: per ogni dungeon la run che vale più
+     * punteggio M+ determina il livello chiave; best % e median % sono calcolati
+     * sulle run di quel livello (metrica per livello chiave).
      */
-    private void showByLevelTable(LinearLayout col, JSONArray list) {
+    private void showByLevel(JSONObject data,
+                             java.util.LinkedHashMap<Integer, String> names, String error) {
+        LinearLayout col = Ui.newCard(this, results);
+        Ui.addSectionTitle(this, col, selectedZoneName);
+        if (data == null) {
+            Ui.addText(this, col, getString(R.string.errore_ricerca, error), 14, 0, false);
+            return;
+        }
+
+        java.util.List<Object[]> rows = new ArrayList<>();
+        double sumBest = 0;
+        double sumMed = 0;
+        int count = 0;
+        for (java.util.Map.Entry<Integer, String> e : names.entrySet()) {
+            JSONObject score = data.optJSONObject("p" + e.getKey());
+            JSONObject dps = data.optJSONObject("d" + e.getKey());
+            JSONArray scoreRanks = score != null ? score.optJSONArray("ranks") : null;
+            JSONArray dpsRanks = dps != null ? dps.optJSONArray("ranks") : null;
+
+            // livello della run che vale più punteggio (quella "contata" dal gioco)
+            int level = 0;
+            double bestPoints = -1;
+            if (scoreRanks != null) {
+                for (int i = 0; i < scoreRanks.length(); i++) {
+                    JSONObject run = scoreRanks.optJSONObject(i);
+                    if (run != null && run.optDouble("amount", 0) > bestPoints) {
+                        bestPoints = run.optDouble("amount", 0);
+                        level = run.optInt("bracketData", 0);
+                    }
+                }
+            }
+            if (level <= 0) {
+                rows.add(new Object[]{e.getValue(), null});
+                continue;
+            }
+            // parse delle run a quel livello
+            java.util.List<Double> pcts = new ArrayList<>();
+            double best = 0;
+            double bestAmount = 0;
+            if (dpsRanks != null) {
+                for (int i = 0; i < dpsRanks.length(); i++) {
+                    JSONObject run = dpsRanks.optJSONObject(i);
+                    if (run == null || run.optInt("bracketData", 0) != level) {
+                        continue;
+                    }
+                    double pct = run.optDouble("rankPercent", 0);
+                    pcts.add(pct);
+                    if (pct >= best) {
+                        best = pct;
+                        bestAmount = run.optDouble("amount", 0);
+                    }
+                }
+            }
+            if (pcts.isEmpty()) {
+                rows.add(new Object[]{e.getValue(), null});
+                continue;
+            }
+            double med = median(pcts);
+            sumBest += best;
+            sumMed += med;
+            count++;
+            rows.add(new Object[]{e.getValue(), level, bestAmount, best, med});
+        }
+
+        if (count > 0) {
+            Ui.addRow(this, col, getString(R.string.media_best),
+                    String.format(Locale.ITALY, "%.1f", sumBest / count),
+                    Ui.parseColor(sumBest / count));
+            Ui.addRow(this, col, getString(R.string.media_mediana),
+                    String.format(Locale.ITALY, "%.1f", sumMed / count),
+                    Ui.parseColor(sumMed / count));
+        } else {
+            Ui.addText(this, col, getString(R.string.wcl_nessun_log), 14, 0, false);
+            return;
+        }
+
         addLevelRow(col, "", getString(R.string.colonna_chiave), getString(R.string.colonna_best),
                 getString(R.string.colonna_best_pct), getString(R.string.colonna_median_pct),
                 true, 0, 0);
-        for (int i = 0; i < list.length(); i++) {
-            JSONObject r = list.optJSONObject(i);
-            JSONObject enc = r.optJSONObject("encounter");
-            String boss = enc != null ? enc.optString("name") : "?";
-            double bestAmount = r.optDouble("bestAmount", 0);
-            if (bestAmount <= 0) {
-                addLevelRow(col, boss, "—", "—", "—", "—", false, 0, 0);
+        for (Object[] r : rows) {
+            if (r[1] == null) {
+                addLevelRow(col, (String) r[0], "—", "—", "—", "—", false, 0, 0);
                 continue;
             }
-            int level = 0;
-            double amount = bestAmount;
-            if (bestAmount >= 40000000) {
-                level = (int) (bestAmount / 20000000);
-                amount = bestAmount - level * 20000000.0;
-            }
-            double best = r.optDouble("rankPercent", 0);
-            double median = r.optDouble("medianPercent", 0);
-            addLevelRow(col, boss,
-                    level > 0 ? "+" + level : "—",
-                    formatAmount(amount),
+            double best = (double) r[3];
+            double med = (double) r[4];
+            addLevelRow(col, (String) r[0],
+                    "+" + r[1],
+                    formatAmount((double) r[2]),
                     String.format(Locale.ITALY, "%.0f", Math.floor(best)),
-                    String.format(Locale.ITALY, "%.0f", Math.floor(median)),
-                    false, Ui.parseColor(best), Ui.parseColor(median));
+                    String.format(Locale.ITALY, "%.0f", Math.floor(med)),
+                    false, Ui.parseColor(best), Ui.parseColor(med));
         }
+    }
+
+    private static double median(java.util.List<Double> values) {
+        if (values.isEmpty()) {
+            return 0;
+        }
+        java.util.Collections.sort(values);
+        int n = values.size();
+        return n % 2 == 1 ? values.get(n / 2)
+                : (values.get(n / 2 - 1) + values.get(n / 2)) / 2;
     }
 
     private void addLevelRow(LinearLayout parent, String label, String v1, String v2,

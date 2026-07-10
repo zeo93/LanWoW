@@ -121,21 +121,60 @@ public final class WarcraftLogs {
      */
     public static JSONArray fetchExpansions(Context c) throws Exception {
         SharedPreferences p = prefs(c);
-        String cached = p.getString("expansions", null);
+        // "expansions2": la v1 della cache non conteneva gli encounter
+        String cached = p.getString("expansions2", null);
         long ts = p.getLong("expansions_ts", 0);
         if (cached != null && System.currentTimeMillis() - ts < 24L * 3600 * 1000) {
             return new JSONArray(cached);
         }
         JSONObject data = graphql(c,
-                "{worldData{expansions{id name zones{id name difficulties{id name}}}}}", null);
+                "{worldData{expansions{id name zones{id name "
+                        + "difficulties{id name} encounters{id name}}}}}", null);
         JSONObject worldData = data.optJSONObject("worldData");
         JSONArray exps = worldData != null ? worldData.optJSONArray("expansions") : null;
         if (exps == null || exps.length() == 0) {
             throw new Exception("elenco espansioni non disponibile");
         }
-        p.edit().putString("expansions", exps.toString())
+        p.edit().putString("expansions2", exps.toString())
                 .putLong("expansions_ts", System.currentTimeMillis()).apply();
         return exps;
+    }
+
+    /**
+     * Dati "by level" per ogni encounter della zona, in una sola query con alias:
+     * per ogni dungeon le run a punteggio M+ (p&lt;id&gt;, per trovare la run migliore
+     * come sul sito) e le run con parse per livello chiave (d&lt;id&gt;).
+     * Restituisce l'oggetto character con i campi p&lt;id&gt;/d&lt;id&gt;.
+     */
+    public static JSONObject fetchByLevel(
+            Context c, String region, String realmSlug, String name,
+            java.util.List<int[]> encounterIds, String metric) throws Exception {
+        StringBuilder q = new StringBuilder(
+                "query($name:String!,$server:String!,$region:String!){"
+                        + "characterData{character(name:$name,serverSlug:$server,"
+                        + "serverRegion:$region){");
+        for (int[] e : encounterIds) {
+            q.append("p").append(e[0])
+                    .append(":encounterRankings(encounterID:").append(e[0])
+                    .append(",metric:playerscore) ");
+            q.append("d").append(e[0])
+                    .append(":encounterRankings(encounterID:").append(e[0])
+                    .append(",metric:").append(metric)
+                    .append(",byBracket:true) ");
+        }
+        q.append("}}}");
+        JSONObject variables = new JSONObject()
+                .put("name", name.trim())
+                .put("server", realmSlug)
+                .put("region", region);
+        JSONObject data = graphql(c, q.toString(), variables);
+        JSONObject characterData = data.optJSONObject("characterData");
+        JSONObject character = characterData != null
+                ? characterData.optJSONObject("character") : null;
+        if (character == null) {
+            throw new Exception(c.getString(R.string.wcl_personaggio_non_trovato));
+        }
+        return character;
     }
 
     /**
