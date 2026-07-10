@@ -44,6 +44,10 @@
     <string name="difficolta">Difficoltà</string>
     <string name="metrica">Metrica</string>
     <string name="predefinita">Predefinita</string>
+    <string name="colonna_chiave">Chiave</string>
+    <string name="colonna_best">Best</string>
+    <string name="colonna_best_pct">Best %</string>
+    <string name="colonna_median_pct">Med %</string>
 
     <!-- Notifiche -->
     <string name="canale_aggiornamenti">Aggiornamenti app</string>

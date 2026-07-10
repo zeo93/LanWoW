@@ -1,7 +1,7 @@
 /* LanWoW web — stessa app Android in versione PWA. */
 "use strict";
 
-const VERSION = "2.10";
+const VERSION = "2.11";
 const REPO = "zeo93/LanWoW";
 const REGIONS = ["eu", "us", "kr", "tw"];
 
@@ -508,6 +508,39 @@ async function renderLogs(region, realm, name) {
       const list = r.rankings || [];
       if (!list.length) {
         html += '<div class="muted">Nessun log trovato per questa selezione.</div>';
+      }
+      if (state.bracket && list.length) {
+        // tabella "by level" come sul sito: chiave, best DPS/HPS, best %, median %
+        const fmtAmount = (a) => a >= 1e6
+          ? (a / 1e6).toLocaleString("it-IT", { maximumFractionDigits: 1 }) + "M"
+          : (a / 1e3).toLocaleString("it-IT", { maximumFractionDigits: 1 }) + "K";
+        html += '<div class="level-row header"><span class="level-label"></span>'
+          + "<span>Chiave</span><span>Best</span><span>Best %</span><span>Med %</span></div>";
+        for (const it of list) {
+          const boss = esc(it.encounter ? it.encounter.name : "?");
+          const bestAmount = it.bestAmount || 0;
+          if (bestAmount <= 0) {
+            html += `<div class="level-row"><span class="level-label">${boss}</span>`
+              + "<span>—</span><span>—</span><span>—</span><span>—</span></div>";
+            continue;
+          }
+          // nelle zone M+ bestAmount codifica livello e valore: livello*20M + DPS
+          let level = 0;
+          let amount = bestAmount;
+          if (bestAmount >= 40e6) {
+            level = Math.floor(bestAmount / 20e6);
+            amount = bestAmount - level * 20e6;
+          }
+          const best = it.rankPercent || 0;
+          const median = it.medianPercent || 0;
+          html += `<div class="level-row"><span class="level-label">${boss}</span>`
+            + `<span>${level > 0 ? "+" + level : "—"}</span>`
+            + `<span>${fmtAmount(amount)}</span>`
+            + `<span style="color:${parseColor(best)}">${Math.floor(best)}</span>`
+            + `<span style="color:${parseColor(median)}">${Math.floor(median)}</span></div>`;
+        }
+        out.innerHTML = card(html);
+        return;
       }
       for (const it of list) {
         const boss = it.encounter ? it.encounter.name : "?";

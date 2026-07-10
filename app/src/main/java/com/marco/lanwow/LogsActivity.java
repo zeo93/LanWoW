@@ -262,6 +262,10 @@ public class LogsActivity extends AppCompatActivity {
             Ui.addText(this, col, getString(R.string.wcl_nessun_log), 14, 0, false);
             return;
         }
+        if (METRIC_BRACKET[selectedMetricIdx]) {
+            showByLevelTable(col, list);
+            return;
+        }
         boolean any = false;
         for (int i = 0; i < list.length(); i++) {
             JSONObject r = list.optJSONObject(i);
@@ -281,5 +285,85 @@ public class LogsActivity extends AppCompatActivity {
         if (!any && Double.isNaN(bestAvg)) {
             Ui.addText(this, col, getString(R.string.wcl_nessun_log), 14, 0, false);
         }
+    }
+
+    /**
+     * Tabella "by level" come sul sito: chiave, best DPS/HPS, best % e median %.
+     * Nelle zone M+ bestAmount codifica livello e valore: livello*20M + DPS.
+     */
+    private void showByLevelTable(LinearLayout col, JSONArray list) {
+        addLevelRow(col, "", getString(R.string.colonna_chiave), getString(R.string.colonna_best),
+                getString(R.string.colonna_best_pct), getString(R.string.colonna_median_pct),
+                true, 0, 0);
+        for (int i = 0; i < list.length(); i++) {
+            JSONObject r = list.optJSONObject(i);
+            JSONObject enc = r.optJSONObject("encounter");
+            String boss = enc != null ? enc.optString("name") : "?";
+            double bestAmount = r.optDouble("bestAmount", 0);
+            if (bestAmount <= 0) {
+                addLevelRow(col, boss, "—", "—", "—", "—", false, 0, 0);
+                continue;
+            }
+            int level = 0;
+            double amount = bestAmount;
+            if (bestAmount >= 40000000) {
+                level = (int) (bestAmount / 20000000);
+                amount = bestAmount - level * 20000000.0;
+            }
+            double best = r.optDouble("rankPercent", 0);
+            double median = r.optDouble("medianPercent", 0);
+            addLevelRow(col, boss,
+                    level > 0 ? "+" + level : "—",
+                    formatAmount(amount),
+                    String.format(Locale.ITALY, "%.0f", Math.floor(best)),
+                    String.format(Locale.ITALY, "%.0f", Math.floor(median)),
+                    false, Ui.parseColor(best), Ui.parseColor(median));
+        }
+    }
+
+    private void addLevelRow(LinearLayout parent, String label, String v1, String v2,
+                             String v3, String v4, boolean header, int c3, int c4) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, Ui.dp(this, 3), 0, Ui.dp(this, 3));
+
+        android.widget.TextView l = new android.widget.TextView(this);
+        l.setText(label);
+        l.setTextSize(header ? 11 : 13);
+        l.setLayoutParams(new LinearLayout.LayoutParams(0,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(l);
+
+        String[] values = {v1, v2, v3, v4};
+        int[] widths = {40, 62, 44, 44};
+        int[] colors = {0, 0, c3, c4};
+        for (int i = 0; i < 4; i++) {
+            android.widget.TextView v = new android.widget.TextView(this);
+            v.setText(values[i]);
+            v.setTextSize(header ? 11 : 13);
+            v.setMinWidth(Ui.dp(this, widths[i]));
+            v.setGravity(android.view.Gravity.END);
+            if (header) {
+                v.setTextColor(0xFF9AA3B8);
+            } else {
+                v.setTypeface(null, android.graphics.Typeface.BOLD);
+                if (colors[i] != 0) {
+                    v.setTextColor(colors[i]);
+                }
+            }
+            row.addView(v);
+        }
+        parent.addView(row);
+    }
+
+    /** 164732 → "164,7K"; 2500000 → "2,5M". */
+    private static String formatAmount(double amount) {
+        if (amount >= 1000000) {
+            return String.format(Locale.ITALY, "%.1fM", amount / 1000000);
+        }
+        if (amount >= 1000) {
+            return String.format(Locale.ITALY, "%.1fK", amount / 1000);
+        }
+        return String.format(Locale.ITALY, "%.0f", amount);
     }
 }
