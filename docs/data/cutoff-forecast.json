@@ -1,19 +1,19 @@
 {
   "EU": {
-    "current": 4196.05,
-    "estimation": 4222.3
+    "current": 4198.95,
+    "estimation": 4223.1
   },
   "US": {
-    "current": 4168.9,
-    "estimation": 4191.9
+    "current": 4173.29,
+    "estimation": 4193.8
   },
   "KR": {
-    "current": 4214.57,
-    "estimation": 4249.2
+    "current": 4219.18,
+    "estimation": 4248
   },
   "TW": {
     "current": 4244,
-    "estimation": 4272.6
+    "estimation": 4271
   },
-  "updatedAt": "2026-07-31T08:09:58Z"
+  "updatedAt": "2026-08-01T07:38:04Z"
 }
