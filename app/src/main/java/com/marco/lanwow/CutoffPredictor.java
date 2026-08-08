@@ -31,11 +31,14 @@ public final class CutoffPredictor {
      */
     public static final long EFFECTIVE_SEASON_MS = 22L * 7 * 24 * 3600 * 1000;
 
-    /** Data di fine nota per stagioni specifiche in formato ISO (null = non nota). */
+    /**
+     * Data in cui i cutoff dei titoli vengono congelati, in formato ISO (null = non nota).
+     * È diversa dalla fine formale della stagione, che su raider.io coincide con
+     * l'inizio di quella successiva.
+     */
     public static String knownEndIso(String seasonSlug) {
         if ("season-mn-1".equals(seasonSlug)) {
-            // chiusura prevista: 11 agosto 2026
-            return "2026-08-11";
+            return "2026-08-12";
         }
         return null;
     }
@@ -45,6 +48,19 @@ public final class CutoffPredictor {
         String iso = knownEndIso(seasonSlug);
         return iso == null ? 0
                 : java.time.Instant.parse(iso + "T00:00:00Z").toEpochMilli();
+    }
+
+    /** Fine dei cutoff: data pubblicata da raider.io, altrimenti quella nota o stimata. */
+    public static long effectiveEnd(RaiderIo.Season s) {
+        if (s.cutoffEndMs > 0) {
+            return Math.min(s.endMs, s.cutoffEndMs);
+        }
+        return effectiveEnd(s.slug, s.startMs, s.endMs);
+    }
+
+    /** true se i cutoff della stagione sono ormai definitivi. */
+    public static boolean isConcluded(RaiderIo.Season s) {
+        return System.currentTimeMillis() >= effectiveEnd(s);
     }
 
     /** Fine effettiva della stagione ai fini della previsione. */

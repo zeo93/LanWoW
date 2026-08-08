@@ -1,7 +1,7 @@
 /* LanWoW web — stessa app Android in versione PWA. */
 "use strict";
 
-const VERSION = "2.12";
+const VERSION = "2.13";
 const REPO = "zeo93/LanWoW";
 const REGIONS = ["eu", "us", "kr", "tw"];
 
@@ -126,25 +126,49 @@ function seasonScore(profile) {
   return { value: (s && s.scores && s.scores.all) || 0, color: "#ffffff" };
 }
 
-async function currentSeason(region) {
-  const cached = store.get("season_" + region);
-  if (cached && Date.now() - cached.ts < 86400e3) return cached.season;
-  const now = Date.now();
-  for (let expId = 11; expId <= 15; expId++) {
+/**
+ * Stagioni M+ principali già iniziate, dalla più recente alla più vecchia:
+ * la prima è quella in corso, le altre formano l'archivio.
+ */
+async function fetchSeasons(region) {
+  const cached = store.get("seasons_" + region);
+  if (cached && Date.now() - cached.ts < 86400e3) return cached.list;
+  const byId = new Map();
+  const cutoffEnds = new Map();
+  for (let expId = 13; expId >= 9; expId--) {
     let data;
     try { data = await rio.staticData(expId); } catch { continue; }
     for (const s of data.seasons || []) {
-      if (!s.is_main_season || !s.starts || !s.ends) continue;
-      const st = Date.parse(s.starts[region] || "");
-      const en = Date.parse(s.ends[region] || "");
-      if (st && en && now >= st && now < en) {
-        const season = { slug: s.slug, name: s.name, startMs: st, endMs: en };
-        store.set("season_" + region, { ts: now, season });
-        return season;
+      if (!s.starts || !s.ends) continue;
+      const startMs = Date.parse(s.starts[region] || "");
+      const endMs = Date.parse(s.ends[region] || "");
+      if (!startMs || !endMs) continue;
+      // le varianti "-cutoffs" dicono quando i cutoff sono stati congelati
+      if (s.slug.endsWith("-cutoffs")) {
+        cutoffEnds.set(s.blizzard_season_id, endMs);
+        continue;
+      }
+      if (!s.is_main_season) continue;
+      const prev = byId.get(s.blizzard_season_id);
+      // una stagione può comparire più volte (es. "• Post"): tengo lo slug più corto
+      if (!prev || s.slug.length < prev.slug.length) {
+        byId.set(s.blizzard_season_id, {
+          slug: s.slug,
+          name: s.name.split("•")[0].trim(),
+          startMs,
+          endMs,
+          bid: s.blizzard_season_id,
+        });
       }
     }
   }
-  throw new Error("stagione M+ corrente non trovata");
+  const list = [...byId.values()]
+    .filter((s) => s.startMs <= Date.now())
+    .sort((a, b) => b.startMs - a.startMs)
+    .map((s) => ({ ...s, cutoffEndMs: cutoffEnds.get(s.bid) || 0 }));
+  if (!list.length) throw new Error("elenco stagioni non disponibile");
+  store.set("seasons_" + region, { ts: Date.now(), list });
+  return list;
 }
 
 // ------------------------------------------------------------------ API WarcraftLogs
@@ -636,89 +660,142 @@ async function renderLogs(region, realm, name) {
 
 // ------------------------------------------------------------------ titolo M+
 
-async function renderTitle() {
-  setHeader("Titolo M+", true);
-  const region = store.get("region", "eu");
-  view.innerHTML = card(`
-    <label class="field">Regione
-      <select id="t-region">${REGIONS.map((r) =>
-        `<option ${r === region ? "selected" : ""}>${r}</option>`).join("")}</select>
-    </label>`)
-    + '<div id="title-out">' + spinner + "</div>";
-  $("#t-region").onchange = (e) => loadTitle(e.target.value);
-  loadTitle(region);
+/** Data in cui i cutoff si congelano: da raider.io, dalla config o stimata. */
+function cutoffEnd(season, cfg) {
+  if (season.cutoffEndMs) return Math.min(season.endMs, season.cutoffEndMs);
+  const known = cfg && cfg.cutoffEnd && cfg.cutoffEnd[season.slug];
+  if (known) return Math.min(season.endMs, Date.parse(known + "T00:00:00Z"));
+  return Math.min(season.endMs, season.startMs + 22 * 7 * 86400e3);
 }
 
-async function loadTitle(region) {
-  const out = $("#title-out");
-  out.innerHTML = spinner;
-  try {
-    const season = await currentSeason(region);
-    const [cutoffsResp, seasonCfg, forecastData] = await Promise.all([
-      rio.cutoffs(region, season.slug),
-      getJson("data/season.json").catch(() => null),
-      getJson("data/cutoff-forecast.json").catch(() => null),
-    ]);
-    const cutoffs = cutoffsResp.cutoffs || {};
-    const known = seasonCfg && seasonCfg.slug === season.slug
-      ? Date.parse(seasonCfg.endDate + "T00:00:00Z") : 0;
-    const effEnd = known ? Math.min(season.endMs, known)
-      : Math.min(season.endMs, season.startMs + 22 * 7 * 86400e3);
+async function renderTitle() {
+  setHeader("Titolo M+", true);
+  const state = { region: store.get("region", "eu"), seasons: [], idx: 0, seq: 0 };
 
-    const factionRows = (pct, mapValue) => {
-      const block = cutoffs[pct];
-      if (!block) return "";
-      return [["horde", "Orda", block.hordeColor],
-              ["alliance", "Alleanza", block.allianceColor],
-              ["all", "Tutti", block.allColor]]
-        .filter(([k]) => block[k] && block[k].quantileMinValue > 0)
-        .map(([k, label, color]) =>
-          row(label, mapValue(block[k].quantileMinValue), color)).join("");
-    };
+  view.innerHTML = card(`
+    <label class="field">Stagione
+      <select id="t-season"><option>…</option></select>
+    </label>
+    <label class="field">Regione
+      <select id="t-region">${REGIONS.map((r) =>
+        `<option ${r === state.region ? "selected" : ""}>${r}</option>`).join("")}</select>
+    </label>`)
+    + '<div id="title-out">' + spinner + "</div>";
 
-    let html =
-      card('<div class="section-title">Top 0,1% — Titolo</div>'
-        + factionRows("p999", (v) => fmt0(v)))
-      + card('<div class="section-title">Top 1%</div>'
-        + factionRows("p990", (v) => fmt0(v)));
+  const loadCutoffs = async () => {
+    const seq = ++state.seq;
+    const out = $("#title-out");
+    out.innerHTML = spinner;
+    const season = state.seasons[state.idx];
+    const isCurrent = state.idx === 0;
+    try {
+      const [cutoffsResp, cfg, forecastData] = await Promise.all([
+        rio.cutoffs(state.region, season.slug),
+        getJson("data/season.json").catch(() => null),
+        getJson("data/cutoff-forecast.json").catch(() => null),
+      ]);
+      if (seq !== state.seq) return;
+      const cutoffs = cutoffsResp.cutoffs || {};
+      const effEnd = cutoffEnd(season, cfg);
+      const concluded = Date.now() >= effEnd;
 
-    const week = Math.floor((Date.now() - season.startMs) / (7 * 86400e3)) + 1;
-    const totalWeeks = Math.round((effEnd - season.startMs) / (7 * 86400e3));
-    const dt = (ms) => new Date(ms).toLocaleDateString("it-IT");
-    html += card(`<div class="section-title">Stagione: ${esc(season.name)}</div>`
-      + row("Periodo", `${dt(season.startMs)} – ~${dt(effEnd)}`)
-      + row("Avanzamento stagione",
-        `Settimana ${Math.min(week, totalWeeks)} di ~${totalWeeks}`, "#f8b700"));
+      const factionRows = (pct, mapValue) => {
+        const block = cutoffs[pct];
+        if (!block) return "";
+        return [["horde", "Orda", block.hordeColor],
+                ["alliance", "Alleanza", block.allianceColor],
+                ["all", "Tutti", block.allColor]]
+          .filter(([k]) => block[k] && block[k].quantileMinValue > 0)
+          .map(([k, label, color]) =>
+            row(label, mapValue(block[k].quantileMinValue), color)).join("");
+      };
 
-    // previsione: fattore del sito mplus-title (JSON aggiornato ogni giorno
-    // da una GitHub Action) o, in mancanza, stima sulla fase della stagione
-    const fc = forecastData && forecastData[region.toUpperCase()];
-    let factor = null;
-    let method;
-    if (fc && fc.current > 0 && fc.estimation >= fc.current) {
-      factor = fc.estimation / fc.current;
-      method = "Previsione calcolata con la logica di mplus-title.vercel.app "
-        + "(fattore applicato a fazioni e top 1%), aggiornata "
-        + new Date(forecastData.updatedAt).toLocaleDateString("it-IT") + ".";
-    } else {
-      const t = Math.max(0.05, Math.min(1,
-        (Date.now() - season.startMs) / (effEnd - season.startMs)));
-      factor = 1 / (0.70 + 0.30 * t);
-      method = "Stima basata sulla fase della stagione (mplus-title non disponibile).";
+      const dt = (ms) => new Date(ms).toLocaleDateString("it-IT");
+      const seasonCard = () => {
+        let inner = `<div class="section-title">Stagione: ${esc(season.name)}</div>`
+          + row("Periodo", `${dt(season.startMs)} – ${dt(effEnd)}`);
+        if (concluded) {
+          return card(inner + row("Stato", "Conclusa", "#f8b700"));
+        }
+        const week = Math.floor((Date.now() - season.startMs) / (7 * 86400e3)) + 1;
+        const totalWeeks = Math.round((effEnd - season.startMs) / (7 * 86400e3));
+        return card(inner + row("Avanzamento stagione",
+          `Settimana ${Math.min(week, totalWeeks)} di ~${totalWeeks}`, "#f8b700"));
+      };
+
+      const top01 = factionRows("p999", (v) => fmt0(v));
+      const top1 = factionRows("p990", (v) => fmt0(v));
+      if (!top01 && !top1) {
+        out.innerHTML = card(`<div class="section-title">${esc(season.name)}</div>`
+          + '<div class="muted">Cutoff non ancora disponibili per questa stagione.</div>')
+          + seasonCard();
+        return;
+      }
+
+      const stato = concluded
+        ? "Valori definitivi di fine stagione" : "Valori aggiornati a oggi";
+      let html =
+        card('<div class="section-title">Top 0,1% — Titolo</div>'
+          + `<div class="muted" style="margin:0 0 4px">${stato}</div>` + top01)
+        + card('<div class="section-title">Top 1%</div>'
+          + `<div class="muted" style="margin:0 0 4px">${stato}</div>` + top1)
+        + seasonCard();
+
+      // previsione solo per la stagione in corso: fattore del sito mplus-title
+      // (JSON aggiornato ogni giorno da una GitHub Action) o stima sulla fase
+      if (isCurrent && !concluded) {
+        const fc = forecastData && forecastData[state.region.toUpperCase()];
+        let factor;
+        let method;
+        if (fc && fc.current > 0 && fc.estimation >= fc.current) {
+          factor = fc.estimation / fc.current;
+          method = "Previsione calcolata con la logica di mplus-title.vercel.app "
+            + "(fattore applicato a fazioni e top 1%), aggiornata "
+            + new Date(forecastData.updatedAt).toLocaleDateString("it-IT") + ".";
+        } else {
+          const t = Math.max(0.05, Math.min(1,
+            (Date.now() - season.startMs) / (effEnd - season.startMs)));
+          factor = 1 / (0.70 + 0.30 * t);
+          method = "Stima basata sulla fase della stagione (mplus-title non disponibile).";
+        }
+        html += card('<div class="section-title">Previsione fine stagione</div>'
+          + '<div class="subtitle">Top 0,1% — Titolo</div>'
+          + factionRows("p999", (v) => "~" + fmt0(Math.max(v, v * factor)))
+          + '<div class="subtitle">Top 1%</div>'
+          + factionRows("p990", (v) => "~" + fmt0(Math.max(v, v * factor)))
+          + `<div class="muted">${method}</div>`
+          + '<div class="muted">Il titolo va al top 0,1% della propria fazione nella regione. '
+          + "La previsione è indicativa: l'ultima settimana il cutoff può salire più del previsto.</div>");
+      }
+      out.innerHTML = html;
+    } catch (e) {
+      if (seq === state.seq) {
+        out.innerHTML = `<div class="error">Errore: ${esc(e.message)}</div>`;
+      }
     }
-    html += card('<div class="section-title">Previsione fine stagione</div>'
-      + '<div class="subtitle">Top 0,1% — Titolo</div>'
-      + factionRows("p999", (v) => "~" + fmt0(Math.max(v, v * factor)))
-      + '<div class="subtitle">Top 1%</div>'
-      + factionRows("p990", (v) => "~" + fmt0(Math.max(v, v * factor)))
-      + `<div class="muted">${method}</div>`
-      + '<div class="muted">Il titolo va al top 0,1% della propria fazione nella regione. '
-      + "La previsione è indicativa: l'ultima settimana il cutoff può salire più del previsto.</div>");
+  };
 
-    out.innerHTML = html;
-  } catch (e) {
-    out.innerHTML = `<div class="error">Errore: ${esc(e.message)}</div>`;
-  }
+  const loadSeasons = async () => {
+    const seq = ++state.seq;
+    $("#title-out").innerHTML = spinner;
+    try {
+      const list = await fetchSeasons(state.region);
+      if (seq !== state.seq) return;
+      state.seasons = list;
+      state.idx = 0;
+      $("#t-season").innerHTML = list.map((s, i) =>
+        `<option value="${i}">${esc(i === 0 ? s.name + " (in corso)" : s.name)}</option>`).join("");
+      await loadCutoffs();
+    } catch (e) {
+      if (seq === state.seq) {
+        $("#title-out").innerHTML = `<div class="error">Errore: ${esc(e.message)}</div>`;
+      }
+    }
+  };
+
+  $("#t-region").onchange = (e) => { state.region = e.target.value; loadSeasons(); };
+  $("#t-season").onchange = (e) => { state.idx = +e.target.value; loadCutoffs(); };
+  loadSeasons();
 }
 
 // ------------------------------------------------------------------ router + aggiornamenti

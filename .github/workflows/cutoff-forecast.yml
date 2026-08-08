@@ -16,13 +16,21 @@ jobs:
 
       - name: Interroga mplus-title per ogni regione
         run: |
-          END=$(jq -r .endDate docs/data/season.json)
+          # data di blocco cutoff della stagione in corso (la prima non ancora passata);
+          # se sono tutte passate la stagione è finita e non serve alcuna previsione
+          TODAY=$(date -u +%F)
+          END=$(jq -r --arg t "$TODAY" \
+            '.cutoffEnd | to_entries | map(.value) | sort | map(select(. >= $t)) | first // ""' \
+            docs/data/season.json)
           out="{"
           for R in EU US KR TW; do
-            LINE=$(curl -sf "https://mplus-title.vercel.app/api/cutoff/$R?extrapolationEndDate=$END" || true)
-            CUR=$(echo "$LINE" | grep -oP 'Current:\s*\K[\d.]+' || echo null)
-            EST=$(echo "$LINE" | grep -oP 'Estimation \([^)]*\):\s*\K[\d.]+' || echo null)
-            out="$out\"$R\":{\"current\":$CUR,\"estimation\":$EST},"
+            LINE=""
+            if [ -n "$END" ]; then
+              LINE=$(curl -sf "https://mplus-title.vercel.app/api/cutoff/$R?extrapolationEndDate=$END" || true)
+            fi
+            CUR=$(echo "$LINE" | grep -oP 'Current:\s*\K[\d.]+' || true)
+            EST=$(echo "$LINE" | grep -oP 'Estimation \([^)]*\):\s*\K[\d.]+' || true)
+            out="$out\"$R\":{\"current\":${CUR:-null},\"estimation\":${EST:-null}},"
           done
           out="$out\"updatedAt\":\"$(date -u +%FT%TZ)\"}"
           echo "$out" | jq . > docs/data/cutoff-forecast.json

@@ -16,20 +16,33 @@ import androidx.appcompat.widget.Toolbar;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
-/** Previsione del cutoff dei titoli M+ (top 0,1% e top 1%) a fine stagione. */
+/**
+ * Cutoff dei titoli M+ (top 0,1% e top 1%): stagione in corso con previsione di
+ * fine stagione, oppure una stagione passata con i suoi cutoff definitivi.
+ */
 public class TitleActivity extends AppCompatActivity {
 
     private static final String[] REGIONS = {"eu", "us", "kr", "tw"};
+    /** Elenco stagioni per regione, riusato finché l'app resta aperta. */
+    private static final Map<String, List<RaiderIo.Season>> SEASON_CACHE = new HashMap<>();
 
     private final Handler main = new Handler(Looper.getMainLooper());
 
     private AutoCompleteTextView regionInput;
+    private AutoCompleteTextView seasonInput;
     private ProgressBar progress;
     private LinearLayout results;
+
     private String region;
+    private List<RaiderIo.Season> seasons = new ArrayList<>();
+    private int selectedSeason;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,6 +59,7 @@ public class TitleActivity extends AppCompatActivity {
         progress = findViewById(R.id.progress);
         results = findViewById(R.id.results);
         regionInput = findViewById(R.id.input_region);
+        seasonInput = findViewById(R.id.input_season);
 
         region = getSharedPreferences("search", MODE_PRIVATE).getString("region", "eu");
         regionInput.setAdapter(new ArrayAdapter<>(this,
@@ -53,42 +67,99 @@ public class TitleActivity extends AppCompatActivity {
         regionInput.setText(region, false);
         regionInput.setOnItemClickListener((p, v, pos, id) -> {
             region = REGIONS[pos];
-            load();
+            loadSeasons();
         });
 
-        load();
+        loadSeasons();
     }
 
-    private void load() {
+    /** Scarica l'elenco stagioni e popola la tendina (la prima è quella in corso). */
+    private void loadSeasons() {
         progress.setVisibility(View.VISIBLE);
         results.removeAllViews();
         final String reg = region;
 
+        List<RaiderIo.Season> cached = SEASON_CACHE.get(reg);
+        if (cached != null) {
+            applySeasons(cached);
+            return;
+        }
         new Thread(() -> {
-            RaiderIo.Season season = null;
+            List<RaiderIo.Season> list = null;
+            String error = null;
+            try {
+                list = RaiderIo.fetchSeasons(reg);
+            } catch (Exception e) {
+                error = e.getMessage();
+            }
+            final List<RaiderIo.Season> fList = list;
+            final String fError = error;
+            main.post(() -> {
+                if (!reg.equals(region)) {
+                    return;
+                }
+                if (fList == null) {
+                    progress.setVisibility(View.GONE);
+                    LinearLayout col = Ui.newCard(this, results);
+                    Ui.addText(this, col, getString(R.string.errore_ricerca, fError),
+                            14, 0, false);
+                    return;
+                }
+                SEASON_CACHE.put(reg, fList);
+                applySeasons(fList);
+            });
+        }).start();
+    }
+
+    private void applySeasons(List<RaiderIo.Season> list) {
+        seasons = list;
+        selectedSeason = 0;
+        List<String> labels = new ArrayList<>();
+        for (int i = 0; i < list.size(); i++) {
+            RaiderIo.Season s = list.get(i);
+            labels.add(i == 0 ? getString(R.string.stagione_in_corso, s.name) : s.name);
+        }
+        seasonInput.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_list_item_1, labels));
+        seasonInput.setText(labels.get(0), false);
+        seasonInput.setOnItemClickListener((p, v, pos, id) -> {
+            selectedSeason = pos;
+            loadCutoffs();
+        });
+        loadCutoffs();
+    }
+
+    private void loadCutoffs() {
+        progress.setVisibility(View.VISIBLE);
+        results.removeAllViews();
+        final String reg = region;
+        final int idx = selectedSeason;
+        final RaiderIo.Season season = seasons.get(idx);
+        final boolean concluded = CutoffPredictor.isConcluded(season);
+        // la previsione ha senso solo per la stagione in corso non ancora conclusa
+        final boolean wantForecast = idx == 0 && !concluded;
+
+        new Thread(() -> {
             JSONObject cutoffs = null;
             String error = null;
-            MplusTitle.Forecast forecast = null;
             try {
-                season = RaiderIo.fetchCurrentSeason(reg);
                 cutoffs = RaiderIo.fetchSeasonCutoffs(reg, season.slug);
             } catch (Exception e) {
                 error = e.getMessage();
             }
-            if (season != null) {
+            MplusTitle.Forecast forecast = null;
+            if (wantForecast) {
                 try {
-                    forecast = MplusTitle.fetch(reg,
-                            CutoffPredictor.knownEndIso(season.slug));
+                    forecast = MplusTitle.fetch(reg, CutoffPredictor.knownEndIso(season.slug));
                 } catch (Exception ignored) {
                     // il modello interno fa da riserva
                 }
             }
-            final RaiderIo.Season fSeason = season;
             final JSONObject fCutoffs = cutoffs;
             final String fError = error;
             final MplusTitle.Forecast fForecast = forecast;
             main.post(() -> {
-                if (!reg.equals(region)) {
+                if (!reg.equals(region) || idx != selectedSeason) {
                     return;
                 }
                 progress.setVisibility(View.GONE);
@@ -99,14 +170,40 @@ public class TitleActivity extends AppCompatActivity {
                             14, 0, false);
                     return;
                 }
-                saveSnapshot(reg, fSeason, fCutoffs);
-                // in alto i dati attuali di raider.io, in basso la previsione
-                showCurrent(fCutoffs, "p999", getString(R.string.top_01));
-                showCurrent(fCutoffs, "p990", getString(R.string.top_1));
-                showSeason(fSeason);
-                showPrediction(reg, fSeason, fCutoffs, fForecast);
+                if (!hasValues(fCutoffs)) {
+                    LinearLayout col = Ui.newCard(this, results);
+                    Ui.addSectionTitle(this, col, season.name);
+                    Ui.addText(this, col, getString(R.string.cutoff_non_disponibili),
+                            14, 0, false);
+                    return;
+                }
+                if (idx == 0 && !concluded) {
+                    saveSnapshot(reg, season, fCutoffs);
+                }
+                showCutoffs(fCutoffs, "p999", getString(R.string.top_01), concluded);
+                showCutoffs(fCutoffs, "p990", getString(R.string.top_1), concluded);
+                showSeason(season, concluded);
+                if (!concluded && idx == 0) {
+                    showPrediction(reg, season, fCutoffs, fForecast);
+                }
             });
         }).start();
+    }
+
+    private static boolean hasValues(JSONObject cutoffs) {
+        for (String pct : new String[]{"p999", "p990"}) {
+            JSONObject block = cutoffs.optJSONObject(pct);
+            if (block == null) {
+                continue;
+            }
+            for (String fac : new String[]{"horde", "alliance", "all"}) {
+                JSONObject f = block.optJSONObject(fac);
+                if (f != null && f.optDouble("quantileMinValue", 0) > 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** Salva lo storico locale dei sei valori (0,1% e 1% per orda/alleanza/tutti). */
@@ -146,14 +243,16 @@ public class TitleActivity extends AppCompatActivity {
         }
     }
 
-    /** Card con i cutoff attuali presi da raider.io. */
-    private void showCurrent(JSONObject cutoffs, String pct, String title) {
+    /** Card con i cutoff (attuali se la stagione è in corso, definitivi se conclusa). */
+    private void showCutoffs(JSONObject cutoffs, String pct, String title, boolean concluded) {
         JSONObject block = cutoffs.optJSONObject(pct);
         if (block == null) {
             return;
         }
         LinearLayout col = Ui.newCard(this, results);
         Ui.addSectionTitle(this, col, title);
+        Ui.addText(this, col, getString(concluded
+                ? R.string.cutoff_definitivi : R.string.cutoff_attuali), 12, 0, false);
         for (String[] f : factions(block)) {
             JSONObject data = block.optJSONObject(f[0]);
             if (data == null) {
@@ -168,17 +267,21 @@ public class TitleActivity extends AppCompatActivity {
         }
     }
 
-    private void showSeason(RaiderIo.Season season) {
+    private void showSeason(RaiderIo.Season season, boolean concluded) {
         LinearLayout col = Ui.newCard(this, results);
         Ui.addSectionTitle(this, col, getString(R.string.stagione) + ": " + season.name);
-        long effEnd = CutoffPredictor.effectiveEnd(season.slug, season.startMs, season.endMs);
+        long effEnd = CutoffPredictor.effectiveEnd(season);
         SimpleDateFormat fmt = new SimpleDateFormat("dd/MM/yyyy", Locale.ITALY);
         Ui.addRow(this, col, getString(R.string.periodo),
-                fmt.format(new Date(season.startMs)) + " – ~" + fmt.format(new Date(effEnd)), 0);
+                fmt.format(new Date(season.startMs)) + " – " + fmt.format(new Date(effEnd)), 0);
+        if (concluded) {
+            Ui.addRow(this, col, getString(R.string.stato),
+                    getString(R.string.stagione_conclusa), getColor(R.color.gold));
+            return;
+        }
         long now = System.currentTimeMillis();
         int week = (int) ((now - season.startMs) / (7L * 24 * 3600 * 1000)) + 1;
-        int totalWeeks = (int) Math.round((effEnd - season.startMs)
-                / (7.0 * 24 * 3600 * 1000));
+        int totalWeeks = (int) Math.round((effEnd - season.startMs) / (7.0 * 24 * 3600 * 1000));
         Ui.addRow(this, col, getString(R.string.avanzamento),
                 getString(R.string.settimana_di, Math.min(week, totalWeeks), totalWeeks),
                 getColor(R.color.gold));

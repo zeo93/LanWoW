@@ -21,6 +21,12 @@
     <string name="avanzamento">Avanzamento stagione</string>
     <string name="settimana_di">Settimana %1$d di ~%2$d</string>
     <string name="previsione_fine">Previsione fine stagione</string>
+    <string name="stagione_in_corso">%s (in corso)</string>
+    <string name="stagione_conclusa">Conclusa</string>
+    <string name="stato">Stato</string>
+    <string name="cutoff_attuali">Valori aggiornati a oggi</string>
+    <string name="cutoff_definitivi">Valori definitivi di fine stagione</string>
+    <string name="cutoff_non_disponibili">Cutoff non ancora disponibili per questa stagione.</string>
     <string name="top_01">Top 0,1% — Titolo</string>
     <string name="top_1">Top 1%</string>
     <string name="orda_label">Orda</string>

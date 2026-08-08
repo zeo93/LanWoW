@@ -106,21 +106,33 @@ public final class RaiderIo {
         return parseSeasonScore(new JSONObject(Http.get(url)));
     }
 
-    /** Stagione M+ corrente con date di inizio/fine per la regione. */
+    /** Stagione M+ con date di inizio/fine per la regione. */
     public static class Season {
         public String slug;
         public String name;
         public long startMs;
         public long endMs;
+        /** Data in cui i cutoff dei titoli si congelano (0 = non nota). */
+        public long cutoffEndMs;
+        public int blizzardId;
+
+        /** true se la stagione è già iniziata. */
+        boolean started() {
+            return System.currentTimeMillis() >= startMs;
+        }
     }
 
     /**
-     * Trova la stagione M+ principale in corso cercando nelle espansioni recenti.
-     * (11 = Midnight; il ciclo copre anche le espansioni future.)
+     * Stagioni M+ principali già iniziate, dalla più recente alla più vecchia:
+     * la prima è quella in corso, le altre formano l'archivio.
+     * (11 = Midnight; il ciclo copre anche espansioni future e passate.)
      */
-    public static Season fetchCurrentSeason(String region) throws Exception {
-        long now = System.currentTimeMillis();
-        for (int expId = 11; expId <= 15; expId++) {
+    public static List<Season> fetchSeasons(String region) throws Exception {
+        // una stagione può comparire più volte (es. "• Post"): tengo lo slug più corto
+        java.util.Map<Integer, Season> byId = new java.util.HashMap<>();
+        // le varianti "-cutoffs" indicano quando i cutoff sono stati congelati
+        java.util.Map<Integer, Long> cutoffEnds = new java.util.HashMap<>();
+        for (int expId = 13; expId >= 9; expId--) {
             JSONArray seasons;
             try {
                 JSONObject o = new JSONObject(Http.get(
@@ -134,7 +146,7 @@ public final class RaiderIo {
             }
             for (int i = 0; i < seasons.length(); i++) {
                 JSONObject s = seasons.optJSONObject(i);
-                if (s == null || !s.optBoolean("is_main_season")) {
+                if (s == null) {
                     continue;
                 }
                 JSONObject starts = s.optJSONObject("starts");
@@ -147,22 +159,53 @@ public final class RaiderIo {
                 if (st.isEmpty() || en.isEmpty()) {
                     continue;
                 }
+                Season season = new Season();
                 try {
-                    long stm = java.time.Instant.parse(st).toEpochMilli();
-                    long enm = java.time.Instant.parse(en).toEpochMilli();
-                    if (now >= stm && now < enm) {
-                        Season season = new Season();
-                        season.slug = s.optString("slug");
-                        season.name = s.optString("name");
-                        season.startMs = stm;
-                        season.endMs = enm;
-                        return season;
-                    }
-                } catch (Exception ignored) {
+                    season.startMs = java.time.Instant.parse(st).toEpochMilli();
+                    season.endMs = java.time.Instant.parse(en).toEpochMilli();
+                } catch (Exception e) {
+                    continue;
+                }
+                season.slug = s.optString("slug");
+                if (season.slug.endsWith("-cutoffs")) {
+                    cutoffEnds.put(s.optInt("blizzard_season_id", -1), season.endMs);
+                    continue;
+                }
+                if (!s.optBoolean("is_main_season")) {
+                    continue;
+                }
+                season.name = cleanSeasonName(s.optString("name"));
+                season.blizzardId = s.optInt("blizzard_season_id", -1);
+                Season prev = byId.get(season.blizzardId);
+                if (prev == null || season.slug.length() < prev.slug.length()) {
+                    byId.put(season.blizzardId, season);
                 }
             }
         }
-        throw new Exception("stagione M+ corrente non trovata");
+        List<Season> out = new ArrayList<>();
+        for (Season s : byId.values()) {
+            if (s.started()) {
+                Long cutoffEnd = cutoffEnds.get(s.blizzardId);
+                s.cutoffEndMs = cutoffEnd != null ? cutoffEnd : 0;
+                out.add(s);
+            }
+        }
+        java.util.Collections.sort(out, (a, b) -> Long.compare(b.startMs, a.startMs));
+        if (out.isEmpty()) {
+            throw new Exception("elenco stagioni non disponibile");
+        }
+        return out;
+    }
+
+    /** "MN Season 1 • Full" → "MN Season 1". */
+    private static String cleanSeasonName(String name) {
+        int i = name.indexOf('•');
+        return (i > 0 ? name.substring(0, i) : name).trim();
+    }
+
+    /** Stagione attualmente in corso (la più recente già iniziata). */
+    public static Season fetchCurrentSeason(String region) throws Exception {
+        return fetchSeasons(region).get(0);
     }
 
     /** Cutoff dei percentili (p999 = top 0,1%, p990 = top 1%…) per la stagione. */
