@@ -1,7 +1,7 @@
 /* LanWoW web — stessa app Android in versione PWA. */
 "use strict";
 
-const VERSION = "2.13";
+const VERSION = "2.14";
 const REPO = "zeo93/LanWoW";
 const REGIONS = ["eu", "us", "kr", "tw"];
 
@@ -464,10 +464,18 @@ function renderFavorites() {
       <div style="color:${classColor(e.cls)};font-weight:bold;font-size:17px">${esc(e.name)}</div>
       <div class="muted" style="margin:0">${esc(prettify(e.realm))} (${e.region.toUpperCase()})${e.cls ? " · " + esc(e.cls) : ""}</div>
     </div>
+    <div class="score" id="fav-score-${i}">…</div>
     <button class="fav-remove" data-remove="${i}">★</button>
   </div>`, "clickable").replace('<div class="card', `<div data-open="${i}" class="card`)).join("");
 
   all.forEach((e, i) => {
+    // punteggio M+ caricato in parallelo per ogni preferito
+    rio.score(e.region, e.realm, e.name).then((p) => {
+      const s = seasonScore(p);
+      const t = $(`#fav-score-${i}`);
+      if (t) { t.textContent = fmt0(s.value); t.style.color = s.color; }
+    }).catch(() => { const t = $(`#fav-score-${i}`); if (t) t.textContent = ""; });
+
     $(`[data-open="${i}"]`).onclick = (ev) => {
       if (ev.target.dataset.remove !== undefined) return;
       location.hash = `#/char/${e.region}/${encodeURIComponent(e.realm)}/${encodeURIComponent(e.name)}`;

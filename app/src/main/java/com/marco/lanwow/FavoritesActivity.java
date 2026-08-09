@@ -1,6 +1,8 @@
 package com.marco.lanwow;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
@@ -16,6 +18,8 @@ import java.util.List;
 
 /** Elenco dei personaggi preferiti. */
 public class FavoritesActivity extends AppCompatActivity {
+
+    private final Handler main = new Handler(Looper.getMainLooper());
 
     private LinearLayout results;
     private TextView emptyText;
@@ -72,6 +76,15 @@ public class FavoritesActivity extends AppCompatActivity {
             Ui.addText(this, col, prettify(e.realm) + " (" + e.region.toUpperCase() + ")"
                     + (e.cls.isEmpty() ? "" : " · " + e.cls), 13, 0, false);
 
+            // punteggio M+ caricato in parallelo per ogni preferito
+            TextView score = new TextView(this);
+            score.setText("…");
+            score.setTextSize(18);
+            score.setTypeface(null, android.graphics.Typeface.BOLD);
+            score.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 4), 0);
+            row.addView(score);
+            loadScore(e, score);
+
             ImageButton remove = new ImageButton(this);
             remove.setImageResource(android.R.drawable.btn_star_big_on);
             remove.setBackground(null);
@@ -85,6 +98,29 @@ public class FavoritesActivity extends AppCompatActivity {
             card.setOnClickListener(v ->
                     CharacterActivity.open(this, e.region, e.realm, e.name, e.cls));
         }
+    }
+
+    private void loadScore(Favorites.Entry e, TextView target) {
+        new Thread(() -> {
+            RaiderIo.Score s;
+            try {
+                s = RaiderIo.fetchScore(e.region, e.realm, e.name);
+            } catch (Exception ex) {
+                s = null;
+            }
+            final RaiderIo.Score fs = s;
+            main.post(() -> {
+                if (fs == null) {
+                    target.setText("");
+                    return;
+                }
+                target.setText(String.format(java.util.Locale.ITALY, "%.0f", fs.value));
+                try {
+                    target.setTextColor(android.graphics.Color.parseColor(fs.color));
+                } catch (Exception ignored) {
+                }
+            });
+        }).start();
     }
 
     private static String prettify(String slug) {
