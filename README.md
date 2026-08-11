@@ -20,6 +20,23 @@ la previsione del cutoff titolo viene rigenerata ogni giorno da una GitHub Actio
 
 Le credenziali API sono integrate nell'APK: i log funzionano senza configurare nulla.
 
+## Verifica sviluppatore Android (obbligatoria dal 2027)
+
+Google richiederà che le app installate su dispositivi Android certificati siano
+registrate da uno sviluppatore verificato: dal 30/09/2026 solo in Brasile, Indonesia,
+Singapore e Thailandia e solo per gli store aderenti, dal 2027 ovunque e anche per le
+app installate manualmente. Dati necessari per registrare questa app sulla
+[Android Developer Console](https://android.google.com/developerconsole):
+
+- **Package name**: `com.marco.lanwow`
+- **Impronta SHA-256 della chiave di firma**:
+  `B6:F6:56:89:85:9F:74:A4:9E:78:40:A7:DC:CF:BF:CB:A8:A0:15:A2:6D:5E:36:33:67:B1:21:C1:89:C8:25:4A`
+
+Senza il keystore (`app/release.keystore`) non è possibile né registrare il package
+né pubblicare aggiornamenti installabili sopra l'app esistente: va conservato.
+
+La [web app](https://zeo93.github.io/LanWoW/) non è interessata da questi requisiti.
+
 ## Build
 
 Serve un file `secrets.properties` nella cartella del progetto (non è nel repo) con:
