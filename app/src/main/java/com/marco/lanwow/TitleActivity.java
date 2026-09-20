@@ -24,8 +24,9 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Cutoff dei titoli M+ (top 0,1% e top 1%): stagione in corso con previsione di
- * fine stagione, oppure una stagione passata con i suoi cutoff definitivi.
+ * Cutoff M+ (top 0,1% - titolo -, top 1% e top 5%): stagione in corso con la
+ * previsione ufficiale di raider.io per fine stagione, oppure una stagione
+ * passata con i suoi cutoff definitivi.
  */
 public class TitleActivity extends AppCompatActivity {
 
