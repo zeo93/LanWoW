@@ -203,7 +203,7 @@ public class TitleActivity extends AppCompatActivity {
                 if (fAnalysis != null) {
                     showAnalysisCutoffs(fAnalysis, "5", getString(R.string.top_5), concluded);
                 }
-                showSeason(season, concluded);
+                showSeason(season, concluded, targetDateOf(fAnalysis));
                 if (!concluded && idx == 0) {
                     showPrediction(reg, season, fCutoffs, fForecast, fAnalysis);
                 }
@@ -324,10 +324,30 @@ public class TitleActivity extends AppCompatActivity {
         }
     }
 
-    private void showSeason(RaiderIo.Season season, boolean concluded) {
+    /** Fine stagione stimata da raider.io, se disponibile. */
+    private static String targetDateOf(java.util.Map<String, RaiderIo.Analysis> analysis) {
+        if (analysis != null) {
+            for (RaiderIo.Analysis a : analysis.values()) {
+                if (a.targetDate != null && !a.targetDate.isEmpty()) {
+                    return a.targetDate;
+                }
+            }
+        }
+        return null;
+    }
+
+    private void showSeason(RaiderIo.Season season, boolean concluded, String targetDate) {
         LinearLayout col = Ui.newCard(this, results);
         Ui.addSectionTitle(this, col, getString(R.string.stagione) + ": " + season.name);
         long effEnd = CutoffPredictor.effectiveEnd(season);
+        // quando raider.io stima una fine stagione, mostro quella: e la stessa
+        // data su cui si basa la previsione, cosi le due card non si contraddicono
+        if (targetDate != null) {
+            try {
+                effEnd = java.time.Instant.parse(targetDate + "T00:00:00Z").toEpochMilli();
+            } catch (Exception ignored) {
+            }
+        }
         SimpleDateFormat fmt = new SimpleDateFormat("dd/MM/yyyy", Locale.ITALY);
         Ui.addRow(this, col, getString(R.string.periodo),
                 fmt.format(new Date(season.startMs)) + " – " + fmt.format(new Date(effEnd)), 0);

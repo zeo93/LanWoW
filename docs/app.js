@@ -767,14 +767,19 @@ async function renderTitle() {
       };
 
       const dt = (ms) => new Date(ms).toLocaleDateString("it-IT");
+      // quando raider.io stima una fine stagione uso quella, la stessa su cui si
+      // basa la previsione, cosi le due card non si contraddicono
+      const target = analysis
+        && Object.values(analysis).map((a) => a.targetDate).find(Boolean);
+      const shownEnd = target ? Date.parse(target + "T00:00:00Z") : effEnd;
       const seasonCard = () => {
         let inner = `<div class="section-title">Stagione: ${esc(season.name)}</div>`
-          + row("Periodo", `${dt(season.startMs)} – ${dt(effEnd)}`);
+          + row("Periodo", `${dt(season.startMs)} – ${dt(shownEnd)}`);
         if (concluded) {
           return card(inner + row("Stato", "Conclusa", "#f8b700"));
         }
         const week = Math.floor((Date.now() - season.startMs) / (7 * 86400e3)) + 1;
-        const totalWeeks = Math.round((effEnd - season.startMs) / (7 * 86400e3));
+        const totalWeeks = Math.round((shownEnd - season.startMs) / (7 * 86400e3));
         return card(inner + row("Avanzamento stagione",
           `Settimana ${Math.min(week, totalWeeks)} di ~${totalWeeks}`, "#f8b700"));
       };
@@ -811,12 +816,10 @@ async function renderTitle() {
       // previsione solo per la stagione in corso: fattore del sito mplus-title
       // (JSON aggiornato ogni giorno da una GitHub Action) o stima sulla fase
       if (analysis) {
-        let target = null;
         const forecastRows = (pct) => FACTIONS.map(([k, label]) => {
           const a = analysis[k];
           const v = a && a.forecasts[pct];
           if (!v) return "";
-          if (!target) target = a.targetDate;
           return row(label, "~" + fmt0(v), tierColor(a.tiers, v));
         }).join("");
         const r01 = forecastRows("0.1");
