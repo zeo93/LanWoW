@@ -29,8 +29,11 @@
     <string name="cutoff_non_disponibili">Cutoff non ancora disponibili per questa stagione.</string>
     <string name="top_01">Top 0,1% — Titolo</string>
     <string name="top_1">Top 1%</string>
+    <string name="top_5">Top 5%</string>
     <string name="orda_label">Orda</string>
     <string name="tutti">Tutti</string>
+    <string name="metodo_raiderio">Previsione ufficiale di raider.io per la fine della stagione.</string>
+    <string name="metodo_raiderio_data">Previsione ufficiale di raider.io al %s, data di fine stagione stimata dai loro dati.</string>
     <string name="metodo_sito">Previsione calcolata con la logica di mplus-title.vercel.app sullo storico completo della stagione (fattore applicato a fazioni e top 1%).</string>
     <string name="metodo_trend">Previsione basata sull\'andamento rilevato dalle tue consultazioni precedenti (mplus-title non raggiungibile).</string>
     <string name="metodo_fase">Prima stima basata sulla fase della stagione: aprendo questa pagina nei prossimi giorni la previsione si affinerà con l\'andamento reale.</string>

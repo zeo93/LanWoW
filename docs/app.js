@@ -1,7 +1,7 @@
 /* LanWoW web — stessa app Android in versione PWA. */
 "use strict";
 
-const VERSION = "2.14";
+const VERSION = "2.15";
 const REPO = "zeo93/LanWoW";
 const REGIONS = ["eu", "us", "kr", "tw"];
 
@@ -117,7 +117,51 @@ const rio = {
     getJson(`https://raider.io/api/v1/mythic-plus/season-cutoffs?region=${region}&season=${season}`),
   staticData: (expansionId) =>
     getJson(`https://raider.io/api/v1/mythic-plus/static-data?expansion_id=${expansionId}`),
+  cutoffAnalysis: (region, season, faction) =>
+    getJson("https://raider.io/api/v1/mythic-plus/cutoff-analysis?region=" + region
+      + "&season=" + encodeURIComponent(season) + "&faction=" + faction
+      + "&category=overall&percentiles=" + encodeURIComponent("0.1,1,5")
+      + "&density=false&forecastHistory=false"),
 };
+
+const FACTIONS = [["horde", "Orda"], ["alliance", "Alleanza"], ["all", "Tutti"]];
+
+/** Colore raider.io per un punteggio, dalla scala scoreTiers. */
+function tierColor(tiers, score) {
+  for (const t of tiers || []) {
+    if (score >= t.score) return t.color;
+  }
+  return "";
+}
+
+/**
+ * Cutoff attuali (0,1% / 1% / 5%) e previsione ufficiale di raider.io per ogni
+ * fazione. Esiste solo per la stagione in corso: sulle passate risponde 404.
+ */
+async function fetchAnalysis(region, seasonSlug) {
+  const out = {};
+  await Promise.all(FACTIONS.map(async ([faction]) => {
+    const d = await rio.cutoffAnalysis(region, seasonSlug, faction);
+    const cutoffs = {};
+    const cohort = (d.cohorts || [])[0];
+    for (const p of (cohort && cohort.percentiles) || []) {
+      if (p.cutoffScore > 0) cutoffs[String(p.percentile)] = p.cutoffScore;
+    }
+    const forecasts = {};
+    for (const serie of (d.chart && d.chart.series) || []) {
+      if (serie.forecast && serie.forecast.score > 0) {
+        forecasts[String(serie.percentile)] = serie.forecast.score;
+      }
+    }
+    out[faction] = {
+      cutoffs,
+      forecasts,
+      targetDate: d.targetDate && d.targetDate.date,
+      tiers: d.scoreTiers || [],
+    };
+  }));
+  return out;
+}
 
 function seasonScore(profile) {
   const s = (profile.mythic_plus_scores_by_season || [])[0];
@@ -706,6 +750,10 @@ async function renderTitle() {
       const cutoffs = cutoffsResp.cutoffs || {};
       const effEnd = cutoffEnd(season, cfg);
       const concluded = Date.now() >= effEnd;
+      // il 5% e la previsione ufficiale esistono solo per la stagione in corso
+      const analysis = isCurrent && !concluded
+        ? await fetchAnalysis(state.region, season.slug).catch(() => null) : null;
+      if (seq !== state.seq) return;
 
       const factionRows = (pct, mapValue) => {
         const block = cutoffs[pct];
@@ -746,12 +794,46 @@ async function renderTitle() {
         card('<div class="section-title">Top 0,1% — Titolo</div>'
           + `<div class="muted" style="margin:0 0 4px">${stato}</div>` + top01)
         + card('<div class="section-title">Top 1%</div>'
-          + `<div class="muted" style="margin:0 0 4px">${stato}</div>` + top1)
-        + seasonCard();
+          + `<div class="muted" style="margin:0 0 4px">${stato}</div>` + top1);
+
+      if (analysis) {
+        const top5 = FACTIONS.map(([k, label]) => {
+          const v = analysis[k] && analysis[k].cutoffs["5"];
+          return v ? row(label, fmt0(v), tierColor(analysis[k].tiers, v)) : "";
+        }).join("");
+        if (top5) {
+          html += card('<div class="section-title">Top 5%</div>'
+            + `<div class="muted" style="margin:0 0 4px">${stato}</div>` + top5);
+        }
+      }
+      html += seasonCard();
 
       // previsione solo per la stagione in corso: fattore del sito mplus-title
       // (JSON aggiornato ogni giorno da una GitHub Action) o stima sulla fase
-      if (isCurrent && !concluded) {
+      if (analysis) {
+        let target = null;
+        const forecastRows = (pct) => FACTIONS.map(([k, label]) => {
+          const a = analysis[k];
+          const v = a && a.forecasts[pct];
+          if (!v) return "";
+          if (!target) target = a.targetDate;
+          return row(label, "~" + fmt0(v), tierColor(a.tiers, v));
+        }).join("");
+        const r01 = forecastRows("0.1");
+        const r1 = forecastRows("1");
+        const r5 = forecastRows("5");
+        const quando = target
+          ? " al " + target.split("-").reverse().join("/")
+          : "";
+        html += card('<div class="section-title">Previsione fine stagione</div>'
+          + '<div class="subtitle">Top 0,1% — Titolo</div>' + r01
+          + '<div class="subtitle">Top 1%</div>' + r1
+          + '<div class="subtitle">Top 5%</div>' + r5
+          + `<div class="muted">Previsione ufficiale di raider.io${quando}, `
+          + "data di fine stagione stimata dai loro dati.</div>"
+          + '<div class="muted">Il titolo va al top 0,1% della propria fazione nella regione. '
+          + "La previsione è indicativa: l'ultima settimana il cutoff può salire più del previsto.</div>");
+      } else if (isCurrent && !concluded) {
         const fc = forecastData && forecastData[state.region.toUpperCase()];
         let factor;
         let method;

@@ -30,6 +30,7 @@ import java.util.Map;
 public class TitleActivity extends AppCompatActivity {
 
     private static final String[] REGIONS = {"eu", "us", "kr", "tw"};
+    private static final String[] FACTIONS = {"horde", "alliance", "all"};
     /** Elenco stagioni per regione, riusato finché l'app resta aperta. */
     private static final Map<String, List<RaiderIo.Season>> SEASON_CACHE = new HashMap<>();
 
@@ -147,8 +148,24 @@ public class TitleActivity extends AppCompatActivity {
             } catch (Exception e) {
                 error = e.getMessage();
             }
-            MplusTitle.Forecast forecast = null;
+            // analisi ufficiale raider.io: cutoff 5% e previsione di fine stagione
+            java.util.Map<String, RaiderIo.Analysis> analysis = null;
             if (wantForecast) {
+                java.util.Map<String, RaiderIo.Analysis> byFaction = new java.util.HashMap<>();
+                for (String fac : FACTIONS) {
+                    try {
+                        byFaction.put(fac, RaiderIo.fetchCutoffAnalysis(reg, season.slug, fac));
+                    } catch (Exception ignored) {
+                        // stagione senza analisi: si resta ai dati di base
+                    }
+                }
+                if (byFaction.size() == FACTIONS.length) {
+                    analysis = byFaction;
+                }
+            }
+            // mplus-title serve solo quando raider.io non espone i suoi dati
+            MplusTitle.Forecast forecast = null;
+            if (wantForecast && analysis == null) {
                 try {
                     forecast = MplusTitle.fetch(reg, CutoffPredictor.knownEndIso(season.slug));
                 } catch (Exception ignored) {
@@ -158,6 +175,7 @@ public class TitleActivity extends AppCompatActivity {
             final JSONObject fCutoffs = cutoffs;
             final String fError = error;
             final MplusTitle.Forecast fForecast = forecast;
+            final java.util.Map<String, RaiderIo.Analysis> fAnalysis = analysis;
             main.post(() -> {
                 if (!reg.equals(region) || idx != selectedSeason) {
                     return;
@@ -182,9 +200,12 @@ public class TitleActivity extends AppCompatActivity {
                 }
                 showCutoffs(fCutoffs, "p999", getString(R.string.top_01), concluded);
                 showCutoffs(fCutoffs, "p990", getString(R.string.top_1), concluded);
+                if (fAnalysis != null) {
+                    showAnalysisCutoffs(fAnalysis, "5", getString(R.string.top_5), concluded);
+                }
                 showSeason(season, concluded);
                 if (!concluded && idx == 0) {
-                    showPrediction(reg, season, fCutoffs, fForecast);
+                    showPrediction(reg, season, fCutoffs, fForecast, fAnalysis);
                 }
             });
         }).start();
@@ -267,6 +288,42 @@ public class TitleActivity extends AppCompatActivity {
         }
     }
 
+    private String factionLabel(String faction) {
+        switch (faction) {
+            case "horde": return getString(R.string.orda);
+            case "alliance": return getString(R.string.alleanza);
+            default: return getString(R.string.tutti);
+        }
+    }
+
+    /** Da "2027-01-06" a "06/01/2027". */
+    private static String formatIso(String iso) {
+        try {
+            String[] p = iso.split("-");
+            return p[2] + "/" + p[1] + "/" + p[0];
+        } catch (Exception e) {
+            return iso;
+        }
+    }
+
+    /** Card di un percentile ricavato dai dati di analisi raider.io (es. il 5%). */
+    private void showAnalysisCutoffs(java.util.Map<String, RaiderIo.Analysis> analysis,
+                                     String pct, String title, boolean concluded) {
+        LinearLayout col = Ui.newCard(this, results);
+        Ui.addSectionTitle(this, col, title);
+        Ui.addText(this, col, getString(concluded
+                ? R.string.cutoff_definitivi : R.string.cutoff_attuali), 12, 0, false);
+        for (String fac : FACTIONS) {
+            RaiderIo.Analysis a = analysis.get(fac);
+            Double value = a != null ? a.cutoffs.get(pct) : null;
+            if (value == null || value <= 0) {
+                continue;
+            }
+            Ui.addRow(this, col, factionLabel(fac),
+                    String.format(Locale.ITALY, "%.0f", value), safeColor(a.colorFor(value)));
+        }
+    }
+
     private void showSeason(RaiderIo.Season season, boolean concluded) {
         LinearLayout col = Ui.newCard(this, results);
         Ui.addSectionTitle(this, col, getString(R.string.stagione) + ": " + season.name);
@@ -289,9 +346,15 @@ public class TitleActivity extends AppCompatActivity {
 
     /** Card finale con la previsione di fine stagione. */
     private void showPrediction(String reg, RaiderIo.Season season, JSONObject cutoffs,
-                                MplusTitle.Forecast forecast) {
+                                MplusTitle.Forecast forecast,
+                                java.util.Map<String, RaiderIo.Analysis> analysis) {
         LinearLayout col = Ui.newCard(this, results);
         Ui.addSectionTitle(this, col, getString(R.string.previsione_fine));
+
+        if (analysis != null) {
+            showOfficialPrediction(col, analysis);
+            return;
+        }
 
         boolean anyTrend = false;
         for (String[] pctTitle : new String[][]{
@@ -332,6 +395,36 @@ public class TitleActivity extends AppCompatActivity {
             Ui.addText(this, col, getString(anyTrend
                     ? R.string.metodo_trend : R.string.metodo_fase), 12, 0, false);
         }
+        Ui.addText(this, col, getString(R.string.cutoff_note), 12, 0, false);
+    }
+
+    /** Previsione di fine stagione calcolata da raider.io, per percentile e fazione. */
+    private void showOfficialPrediction(LinearLayout col,
+                                        java.util.Map<String, RaiderIo.Analysis> analysis) {
+        String[][] rows = {
+                {"0.1", getString(R.string.top_01)},
+                {"1", getString(R.string.top_1)},
+                {"5", getString(R.string.top_5)},
+        };
+        String targetDate = null;
+        for (String[] r : rows) {
+            Ui.addText(this, col, r[1], 15, getColor(R.color.gold), true);
+            for (String fac : FACTIONS) {
+                RaiderIo.Analysis a = analysis.get(fac);
+                Double value = a != null ? a.forecasts.get(r[0]) : null;
+                if (value == null || value <= 0) {
+                    continue;
+                }
+                if (targetDate == null && a.targetDate != null) {
+                    targetDate = a.targetDate;
+                }
+                Ui.addRow(this, col, factionLabel(fac),
+                        String.format(Locale.ITALY, "~%.0f", value), safeColor(a.colorFor(value)));
+            }
+        }
+        Ui.addText(this, col, targetDate != null
+                        ? getString(R.string.metodo_raiderio_data, formatIso(targetDate))
+                        : getString(R.string.metodo_raiderio), 12, 0, false);
         Ui.addText(this, col, getString(R.string.cutoff_note), 12, 0, false);
     }
 }

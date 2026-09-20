@@ -222,6 +222,84 @@ public final class RaiderIo {
         return cutoffs;
     }
 
+    /**
+     * Analisi cutoff della stagione in corso: valori attuali dei percentili
+     * 0,1% / 1% / 5% e previsione ufficiale di raider.io, per una fazione.
+     * Disponibile solo per la stagione in corso (404 su quelle passate).
+     */
+    public static class Analysis {
+        /** Percentile ("0.1", "1", "5") → punteggio attuale. */
+        public final java.util.Map<String, Double> cutoffs = new java.util.HashMap<>();
+        /** Percentile → punteggio previsto a fine stagione. */
+        public final java.util.Map<String, Double> forecasts = new java.util.HashMap<>();
+        /** Fine stagione stimata da raider.io (ISO, es. 2027-01-06). */
+        public String targetDate;
+        /** Scala punteggio → colore usata da raider.io. */
+        public JSONArray scoreTiers;
+
+        /** Colore raider.io per un punteggio qualsiasi. */
+        public String colorFor(double score) {
+            if (scoreTiers != null) {
+                for (int i = 0; i < scoreTiers.length(); i++) {
+                    JSONObject tier = scoreTiers.optJSONObject(i);
+                    if (tier != null && score >= tier.optDouble("score", Double.MAX_VALUE)) {
+                        return tier.optString("color", "");
+                    }
+                }
+            }
+            return "";
+        }
+    }
+
+    /** Chiave usata nelle mappe di Analysis: 0.1 → "0.1", 5.0 → "5". */
+    private static String pctKey(double percentile) {
+        return percentile == Math.floor(percentile)
+                ? String.valueOf((int) percentile) : String.valueOf(percentile);
+    }
+
+    public static Analysis fetchCutoffAnalysis(String region, String seasonSlug, String faction)
+            throws Exception {
+        String url = "https://raider.io/api/v1/mythic-plus/cutoff-analysis?region="
+                + URLEncoder.encode(region, "UTF-8")
+                + "&season=" + URLEncoder.encode(seasonSlug, "UTF-8")
+                + "&faction=" + URLEncoder.encode(faction, "UTF-8")
+                + "&category=overall&percentiles=" + URLEncoder.encode("0.1,1,5", "UTF-8")
+                + "&density=false&forecastHistory=false";
+        JSONObject o = new JSONObject(Http.get(url));
+        Analysis a = new Analysis();
+        a.scoreTiers = o.optJSONArray("scoreTiers");
+        JSONObject target = o.optJSONObject("targetDate");
+        a.targetDate = target != null ? target.optString("date", null) : null;
+
+        JSONArray cohorts = o.optJSONArray("cohorts");
+        JSONObject cohort = cohorts != null && cohorts.length() > 0
+                ? cohorts.optJSONObject(0) : null;
+        JSONArray pcts = cohort != null ? cohort.optJSONArray("percentiles") : null;
+        if (pcts != null) {
+            for (int i = 0; i < pcts.length(); i++) {
+                JSONObject p = pcts.optJSONObject(i);
+                if (p != null && p.optDouble("cutoffScore", 0) > 0) {
+                    a.cutoffs.put(pctKey(p.optDouble("percentile")), p.optDouble("cutoffScore"));
+                }
+            }
+        }
+        JSONObject chart = o.optJSONObject("chart");
+        JSONArray series = chart != null ? chart.optJSONArray("series") : null;
+        if (series != null) {
+            for (int i = 0; i < series.length(); i++) {
+                JSONObject s = series.optJSONObject(i);
+                JSONObject f = s != null ? s.optJSONObject("forecast") : null;
+                if (f != null && f.optDouble("score", 0) > 0) {
+                    a.forecasts.put(pctKey(s.optDouble("percentile")), f.optDouble("score"));
+                }
+            }
+        }
+        if (a.cutoffs.isEmpty()) {
+            throw new Exception("analisi cutoff non disponibile");
+        }
+        return a;
+    }
+
     public static JSONObject fetchProfile(String region, String realm, String name)
             throws Exception {
         String url = BASE + "?region=" + URLEncoder.encode(region, "UTF-8")
